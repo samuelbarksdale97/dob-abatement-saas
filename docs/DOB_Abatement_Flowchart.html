@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOB Abatement Process - Visual Flowchart</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .meta {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid #f0f0f0;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .meta-item strong {
+            color: #667eea;
+        }
+
+        nav {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+        }
+
+        nav h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        nav ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.75rem;
+        }
+
+        nav a {
+            display: block;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .chart-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            scroll-margin-top: 2rem;
+        }
+
+        .chart-section h2 {
+            font-size: 1.8rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .chart-section p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .mermaid {
+            background: #fafafa;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .legend {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            border-left: 4px solid #667eea;
+        }
+
+        .legend h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .legend-symbol {
+            width: 40px;
+            height: 30px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        footer {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            color: #666;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            nav ul {
+                grid-template-columns: 1fr;
+            }
+
+            .meta {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .chart-section {
+                page-break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+
+            nav {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏢 DOB Abatement Process</h1>
+            <p class="subtitle">Complete Workflow Analysis & Automation Opportunities</p>
+            <div class="meta">
+                <div class="meta-item">
+                    <strong>Client:</strong> Eagle Group / Yoke
+                </div>
+                <div class="meta-item">
+                    <strong>Project:</strong> DOB Abatement Automation
+                </div>
+                <div class="meta-item">
+                    <strong>Created:</strong> January 15, 2026
+                </div>
+                <div class="meta-item">
+                    <strong>By:</strong> Sam Barksdale - NexArc
+                </div>
+            </div>
+        </header>
+
+        <nav>
+            <h2>📋 Quick Navigation</h2>
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#detailed-flow">Detailed Process Flow</a></li>
+                <li><a href="#automation-maturity">Automation Maturity</a></li>
+                <li><a href="#data-architecture">Data Architecture</a></li>
+                <li><a href="#priority-matrix">Priority Matrix</a></li>
+                <li><a href="#decision-tree">Decision Tree</a></li>
+                <li><a href="#metrics">Success Metrics</a></li>
+            </ul>
+        </nav>
+
+        <div class="chart-section" id="overview">
+            <h2>📊 High-Level Process Overview</h2>
+            <p>This diagram shows the complete end-to-end flow from receiving a DOB violation notice to final case closure. The process involves 8 major phases and includes decision points for unit occupancy and response outcomes.</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Open Cases</div>
+                    <div class="stat-value">184</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Vacant Units</div>
+                    <div class="stat-value">23</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Current Timeline</div>
+                    <div class="stat-value">45d</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Target Timeline</div>
+                    <div class="stat-value">14d</div>
+                </div>
+            </div>
+
+            <div class="mermaid">
+flowchart TD
+    Start([DOB Email Arrives]) --> Intake[Phase 1: INTAKE<br/>Parse PDF & Extract Data]
+
+    Intake --> Review[Phase 2: REVIEW & PLANNING<br/>Assess Violations & Resources]
+
+    Review --> CheckOccupancy{Unit<br/>Vacant?}
+
+    CheckOccupancy -->|Yes| FastTrack[Phase 3: FAST TRACK<br/>Schedule Immediately]
+    CheckOccupancy -->|No| TenantCoord[Phase 3: TENANT COORDINATION<br/>Schedule with Resident]
+
+    FastTrack --> WorkExec[Phase 4: WORK EXECUTION<br/>Complete Repairs + Take Photos]
+    TenantCoord --> WorkExec
+
+    WorkExec --> Documentation[Phase 5: DOCUMENTATION<br/>Create Evidence PDF]
+
+    Documentation --> Submission[Phase 6: DOB SUBMISSION<br/>Upload to Portal]
+
+    Submission --> Response{DOB<br/>Response}
+
+    Response -->|Fully Abated| Archive[Phase 8: ARCHIVE<br/>Store & Close]
+    Response -->|Partially Abated| MorePhotos[Need More Evidence]
+    Response -->|Inconclusive| ReInspection[Schedule Re-Inspection]
+
+    MorePhotos --> WorkExec
+    ReInspection --> WaitInspector[Wait for Inspector]
+    WaitInspector --> Archive
+
+    Archive --> End([Case Closed])
+
+    style Start fill:#e1f5e1
+    style End fill:#e1f5e1
+    style Archive fill:#d4edda
+    style CheckOccupancy fill:#fff3cd
+    style Response fill:#fff3cd
+            </div>
+
+            <div class="legend">
+                <h3>Legend</h3>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #e1f5e1; border: 2px solid #4caf50;"></div>
+                    <span>Start/End Points</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #fff3cd; border: 2px solid #ffc107;"></div>
+                    <span>Decision Points (Critical Branching)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #d4edda; border: 2px solid #28a745;"></div>
+                    <span>Success State (Case Closed)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-section" id="detailed-flow">
+            <h2>🔍 Detailed Process Flow with Automation Points</h2>
+            <p>This comprehensive diagram breaks down each phase into specific steps and marks automation opportunities. Look for 🤖 symbols indicating automated or automatable steps.</p>
+
+            <div class="legend">
+                <h3>Automation Status</h3>
+                <div class="legend-item">
+                    <span style="font-size: 1.5rem;">🤖</span>
+                    <span><strong>Automated or Automatable</strong> - Process can be handled by AI/automation</span>
+                </div>
+                <div class="legend-item">
+                    <span style="font-size: 1.5rem;">❌</span>
+                    <span><strong>Manual Process</strong> - Currently requires human intervention</span>
+                </div>
+                <div class="legend-item">
+                    <span style="font-size: 1.5rem;">📱</span>
+                    <span><strong>Mobile Action</strong> - Performed via mobile app/device</span>
+                </div>
+                <div class="legend-item">
+                    <span style="font-size: 1.5rem;">🔔</span>
+                    <span><strong>Notification</strong> - Alert/notification sent to stakeholders</span>
+                </div>
+            </div>
+
+            <div class="mermaid">
+flowchart TD
+    subgraph Phase1[PHASE 1: INTAKE]
+        E1[Email from DOB] --> E2[Chris receives email]
+        E2 --> E3{Auto-trigger<br/>n8n?}
+        E3 -->|🤖 AUTOMATED| A1[Upload PDF to PDF.co]
+        E3 -->|❌ Manual| M1[Chris manually uploads]
+
+        A1 --> A2[Extract text & images]
+        A2 --> A3[AI parses notice data]
+        A2 --> A4[AI extracts work orders]
+        A3 --> A5[Insert into jobs table]
+        A4 --> A6[Insert into work_orders table]
+        A5 --> A7[Link violation images]
+        A6 --> A7
+        A7 --> A8[🔔 Notify Chris on Slack]
+    end
+
+    subgraph Phase2[PHASE 2: REVIEW & PLANNING]
+        A8 --> R1[Chris reviews violations]
+        R1 --> R2{Complexity<br/>Assessment}
+        R2 -->|Simple| R3[Assign to in-house team]
+        R2 -->|Complex| R4[Identify vendor needed]
+
+        R3 --> R5[🤖 AI suggests materials]
+        R4 --> R6[🤖 AI suggests vendor type]
+
+        R5 --> R7[Send to maintenance team]
+        R6 --> R7
+        R7 --> R8[Maintenance estimates timeline]
+    end
+
+    subgraph Phase3[PHASE 3: COORDINATION]
+        R8 --> C1{Unit<br/>Status?}
+        C1 -->|Vacant| C2[🤖 Auto-check AppFolio]
+        C1 -->|Occupied| C3[Property mgr contacts tenant]
+
+        C2 --> C4[Schedule immediately]
+        C3 --> C5[🤖 Auto-generate tenant email]
+        C5 --> C6[🤖 Offer scheduling options]
+        C6 --> C7[Tenant selects time]
+        C7 --> C4
+
+        C4 --> C8[🤖 Send calendar invite to team]
+        C8 --> C9[🤖 SMS reminder 24hrs before]
+    end
+
+    subgraph Phase4[PHASE 4: WORK EXECUTION]
+        C9 --> W1[Maintenance arrives on-site]
+        W1 --> W2[📱 Open mobile app]
+        W2 --> W3[View work orders + before photos]
+        W3 --> W4[Complete repair work]
+
+        W4 --> W5{All items<br/>done?}
+        W5 -->|No| W4
+        W5 -->|Yes| W6[📱 Take after photos]
+
+        W6 --> W7[🤖 AI checks photo quality]
+        W7 --> W8{Photo<br/>OK?}
+        W8 -->|No - wrong angle| W9[🤖 Show error + guidance]
+        W8 -->|No - too blurry| W9
+        W8 -->|Yes| W10[🤖 Auto-upload to cloud]
+
+        W9 --> W6
+        W10 --> W11[🤖 Auto-match to work order]
+        W11 --> W12[✅ Mark item complete]
+    end
+
+    subgraph Phase5[PHASE 5: DOCUMENTATION]
+        W12 --> D1[🤖 Auto-generate evidence PDF]
+        D1 --> D2[🤖 Pull before photos from DB]
+        D1 --> D3[🤖 Pull after photos from DB]
+        D1 --> D4[🤖 Pull work descriptions]
+
+        D2 --> D5[🤖 Apply template layout]
+        D3 --> D5
+        D4 --> D5
+
+        D5 --> D6[🤖 Create side-by-side comparisons]
+        D6 --> D7[🤖 Add timestamps & metadata]
+        D7 --> D8[🤖 Quality check all items]
+        D8 --> D9{All items<br/>documented?}
+        D9 -->|No| D10[🔔 Alert: Missing evidence]
+        D9 -->|Yes| D11[🤖 Generate final PDF]
+
+        D11 --> D12[🤖 Save to Google Drive]
+    end
+
+    subgraph Phase6[PHASE 6: DOB SUBMISSION]
+        D12 --> S1[🤖 Open DOB portal via browser automation]
+        S1 --> S2[🤖 Auto-login]
+        S2 --> S3[🤖 Auto-fill form fields from DB]
+        S3 --> S4[🤖 Upload evidence PDF]
+        S4 --> S5[🤖 Submit form]
+        S5 --> S6[🤖 Capture confirmation number]
+        S6 --> S7[🤖 Update DB status: SUBMITTED]
+        S7 --> S8[🔔 Notify Chris: Submitted]
+    end
+
+    subgraph Phase7[PHASE 7: RESPONSE & FOLLOW-UP]
+        S8 --> F1[DOB sends confirmation email]
+        F1 --> F2[🤖 Email parser detects]
+        F2 --> F3[🤖 Extract confirmation details]
+
+        F3 --> F4[Wait 24 hours]
+        F4 --> F5[Inspector assignment email]
+        F5 --> F6[🤖 Parse inspector info]
+
+        F6 --> F7[Wait ~1 week]
+        F7 --> F8{DOB<br/>Decision}
+
+        F8 -->|Fully Abated| F9[🤖 Update DB: CLOSED]
+        F8 -->|Partially Abated| F10[🤖 Parse which items rejected]
+        F8 -->|Inconclusive| F11[🤖 Parse re-inspection details]
+
+        F9 --> F12[🔔 Success notification]
+        F10 --> F13[🔔 Alert: More photos needed]
+        F11 --> F14[🔔 Alert: Schedule re-inspection]
+
+        F10 --> F15[Create follow-up work order]
+        F15 --> W1
+
+        F11 --> F16[🤖 Suggest batch re-inspection dates]
+        F16 --> F17[Coordinate with DOB]
+        F17 --> F18[Inspector visits]
+        F18 --> F19{Passes?}
+        F19 -->|Yes| F9
+        F19 -->|No| F15
+    end
+
+    subgraph Phase8[PHASE 8: ARCHIVE & ANALYTICS]
+        F12 --> A1[🤖 Archive all documents]
+        A1 --> A2[🤖 Update analytics dashboard]
+        A2 --> A3[Calculate metrics:<br/>- Time to completion<br/>- Cost<br/>- Success rate]
+        A3 --> A4[🤖 Generate insights]
+        A4 --> A5[Feed ML models for predictions]
+    end
+
+    style Phase1 fill:#e3f2fd
+    style Phase2 fill:#f3e5f5
+    style Phase3 fill:#e8f5e9
+    style Phase4 fill:#fff3e0
+    style Phase5 fill:#fce4ec
+    style Phase6 fill:#f1f8e9
+    style Phase7 fill:#e0f2f1
+    style Phase8 fill:#ede7f6
+            </div>
+        </div>
+
+        <div class="chart-section" id="automation-maturity">
+            <h2>🚀 Automation Maturity Roadmap</h2>
+            <p>This shows the progression from current state through four phases of automation maturity. Each phase builds on the previous, increasing efficiency and capability.</p>
+
+            <div class="mermaid">
+flowchart LR
+    subgraph Current["CURRENT STATE ⚡"]
+        C1[PDF Upload]
+        C2[Text Extraction]
+        C3[AI Data Parsing]
+        C4[Database Insert]
+        C5[Image Storage]
+    end
+
+    subgraph Phase1["PHASE 1: Quick Wins 🎯"]
+        P1[Email Trigger]
+        P2[PDF Auto-Generation]
+        P3[Mobile Photo Upload]
+        P4[Slack Notifications]
+    end
+
+    subgraph Phase2["PHASE 2: Force Multipliers 🚀"]
+        P5[Mobile App]
+        P6[Portal Automation]
+        P7[Email Parser]
+        P8[Real-time Progress]
+    end
+
+    subgraph Phase3["PHASE 3: Intelligence 🧠"]
+        P9[AI Work Estimator]
+        P10[Photo Quality AI]
+        P11[Analytics Dashboard]
+        P12[Predictive Models]
+    end
+
+    subgraph Phase4["PHASE 4: Ecosystem 🌐"]
+        P13[AppFolio Integration]
+        P14[Multi-Property]
+        P15[White-Label SaaS]
+        P16[Public API]
+    end
+
+    Current --> Phase1
+    Phase1 --> Phase2
+    Phase2 --> Phase3
+    Phase3 --> Phase4
+
+    style Current fill:#c8e6c9
+    style Phase1 fill:#fff9c4
+    style Phase2 fill:#ffccbc
+    style Phase3 fill:#d1c4e9
+    style Phase4 fill:#b3e5fc
+            </div>
+
+            <div class="legend">
+                <h3>Phase Timeline Estimates</h3>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #c8e6c9;"></div>
+                    <span><strong>Current State</strong> - Already implemented (~40% of total automation)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #fff9c4;"></div>
+                    <span><strong>Phase 1</strong> - 1-2 weeks (60% reduction in manual work for vacant units)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #ffccbc;"></div>
+                    <span><strong>Phase 2</strong> - 3-4 weeks (Handle 10x more units with same team)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #d1c4e9;"></div>
+                    <span><strong>Phase 3</strong> - 5-8 weeks (Predictive, proactive system)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #b3e5fc;"></div>
+                    <span><strong>Phase 4</strong> - 2-3 months (Become DC housing provider standard)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-section" id="data-architecture">
+            <h2>🏗️ Data Flow Architecture</h2>
+            <p>This diagram illustrates how data flows through the system, from input sources through processing layers to storage and user interfaces.</p>
+
+            <div class="mermaid">
+flowchart TD
+    subgraph Input["INPUT SOURCES"]
+        I1[DOB Email]
+        I2[Maintenance Team]
+        I3[DOB Portal Responses]
+        I4[AppFolio Property Data]
+    end
+
+    subgraph Processing["PROCESSING LAYER"]
+        P1[n8n Workflows]
+        P2[AI Models<br/>GPT-4 / Gemini]
+        P3[Browser Automation<br/>Playwright]
+        P4[Email Parser]
+    end
+
+    subgraph Storage["STORAGE LAYER"]
+        S1[(Supabase DB)]
+        S2[Supabase Storage<br/>Images]
+        S3[Google Drive<br/>Archives]
+    end
+
+    subgraph Interface["USER INTERFACES"]
+        U1[Mobile App<br/>Maintenance]
+        U2[Admin Dashboard<br/>Chris/Nikita]
+        U3[Analytics<br/>Reporting]
+        U4[Slack<br/>Notifications]
+    end
+
+    I1 --> P1
+    I2 --> U1
+    I3 --> P4
+    I4 --> P1
+
+    P1 --> P2
+    P1 --> P3
+    P4 --> P1
+
+    P2 --> S1
+    P2 --> S2
+    P3 --> S1
+    P1 --> S3
+
+    S1 --> U2
+    S1 --> U3
+    S2 --> U1
+    S1 --> U4
+
+    style Input fill:#e1f5e1
+    style Processing fill:#fff3cd
+    style Storage fill:#d1ecf1
+    style Interface fill:#f8d7da
+            </div>
+
+            <div class="legend">
+                <h3>Technology Stack</h3>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #e1f5e1;"></div>
+                    <span><strong>Input Sources</strong> - External data entry points</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #fff3cd;"></div>
+                    <span><strong>Processing Layer</strong> - Automation engines and AI models</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #d1ecf1;"></div>
+                    <span><strong>Storage Layer</strong> - Database and file storage systems</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #f8d7da;"></div>
+                    <span><strong>User Interfaces</strong> - End-user interaction points</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-section" id="decision-tree">
+            <h2>🌳 Process Decision Tree</h2>
+            <p>This flowchart maps all the critical decision points in the abatement process, showing how different scenarios are handled.</p>
+
+            <div class="mermaid">
+flowchart TD
+    Start{New NOI<br/>Received}
+
+    Start -->|Priority 1<br/>24hr| Urgent[URGENT PATH]
+    Start -->|Priority 2<br/>60 days| Standard[STANDARD PATH]
+
+    Urgent --> U1{Vacant?}
+    Standard --> S1{Vacant?}
+
+    U1 -->|Yes| U2[🚨 Drop everything]
+    U1 -->|No| U3[Emergency tenant contact]
+
+    S1 -->|Yes| S2[Add to vacant queue]
+    S1 -->|No| S3[Schedule with tenant]
+
+    U2 --> Check1{Can do<br/>in-house?}
+    U3 --> Check1
+    S2 --> Check1
+    S3 --> Check1
+
+    Check1 -->|Yes| Team[Assign to maintenance]
+    Check1 -->|No| Vendor[Find vendor]
+
+    Team --> Execute[Execute work]
+    Vendor --> VendorCheck{Vendor<br/>available?}
+
+    VendorCheck -->|Yes| Execute
+    VendorCheck -->|No| FindAnother[Find another vendor]
+    FindAnother --> Execute
+
+    Execute --> Photos[Take photos]
+    Photos --> Quality{Photos<br/>good?}
+
+    Quality -->|Yes| Submit[Submit to DOB]
+    Quality -->|No| Retake[Retake photos]
+    Retake --> Photos
+
+    Submit --> Wait[Wait for response]
+    Wait --> Response{Response}
+
+    Response -->|Approved| Done[✅ DONE]
+    Response -->|Rejected| Redo[Redo work]
+    Response -->|More Photos| Retake
+
+    Redo --> Execute
+
+    style Start fill:#e1f5e1
+    style Urgent fill:#ffcccc
+    style Done fill:#c8e6c9
+            </div>
+
+            <div class="legend">
+                <h3>Priority Levels</h3>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #ffcccc; border: 2px solid #dc3545;"></div>
+                    <span><strong>Priority 1 (24 hours)</strong> - Critical violations requiring immediate action</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #fff3cd; border: 2px solid #ffc107;"></div>
+                    <span><strong>Priority 2 (60 days)</strong> - Standard violations with normal timeline</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: #c8e6c9; border: 2px solid #28a745;"></div>
+                    <span><strong>Success State</strong> - Violation fully abated and closed</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-section" id="metrics">
+            <h2>📈 Success Metrics Dashboard</h2>
+            <p>Key performance indicators to track system effectiveness and identify areas for improvement.</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">⏱️ Avg Time to Submission</div>
+                    <div class="stat-value">45d</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">Target: 14 days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">✅ First-Time Approval</div>
+                    <div class="stat-value">72%</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">Target: 90%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">💰 Fines Reduced (YTD)</div>
+                    <div class="stat-value">$12K</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">This month: $12,450</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📊 Open Cases</div>
+                    <div class="stat-value">184</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">Vacant: 23 | Occupied: 161</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">🏃 In Progress</div>
+                    <div class="stat-value">11</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">Execution: 3 | Awaiting: 8</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📈 Success by Type</div>
+                    <div class="stat-value">85%</div>
+                    <div class="stat-label" style="margin-top: 0.5rem; opacity: 0.8;">Pest: 85% | Plumb: 78%</div>
+                </div>
+            </div>
+
+            <div class="legend" style="margin-top: 2rem;">
+                <h3>Metrics to Track</h3>
+                <ul style="list-style-position: inside; color: #666;">
+                    <li><strong>Speed:</strong> Time to submission, time from submission to response, rework rate</li>
+                    <li><strong>Quality:</strong> First-time approval rate, photo rejection rate, complete abatement rate</li>
+                    <li><strong>Financial:</strong> Total fines reduced, cost per abatement, ROI of automation</li>
+                    <li><strong>Operational:</strong> Units processed per week, backlog size, vacant unit queue</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>DOB Abatement Process Analysis</strong></p>
+            <p>Created by Sam Barksdale - NexArc | For Eagle Group / Yoke</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: #999;">January 15, 2026 | Interactive flowcharts powered by Mermaid.js</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            themeVariables: {
+                primaryColor: '#667eea',
+                primaryTextColor: '#333',
+                primaryBorderColor: '#667eea',
+                lineColor: '#764ba2',
+                secondaryColor: '#f3e5f5',
+                tertiaryColor: '#e3f2fd'
+            }
+        });
+
+        // Smooth scrolling for navigation
+        document.querySelectorAll('nav a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Add print functionality
+        console.log('%c📊 DOB Abatement Flowchart Loaded Successfully', 'color: #667eea; font-size: 16px; font-weight: bold;');
+        console.log('%cUse Cmd/Ctrl+P to print this document', 'color: #666; font-size: 12px;');
+    </script>
+</body>
+</html>

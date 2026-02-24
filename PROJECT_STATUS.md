@@ -7,6 +7,21 @@
 
 ---
 
+## 0. Supporting Documents (in `docs/`)
+
+All reference material is checked into the repo under `docs/`:
+
+| File | What It Is |
+|------|-----------|
+| [technical-specification.md](docs/technical-specification.md) | Full tech spec — functional requirements, data models, acceptance criteria, UI/UX specs, implementation phases, user stories |
+| [meeting-transcript-2026-01-12-kickoff.md](docs/meeting-transcript-2026-01-12-kickoff.md) | Team kickoff meeting (Chris Grant, Nikita Gray, Andy Parker, Sam Barksdale) — full lifecycle walkthrough, business context, 184 open violations |
+| [meeting-transcript-2026-01-15-process-walkthrough.md](docs/meeting-transcript-2026-01-15-process-walkthrough.md) | 1-on-1 with Nikita — detailed process walkthrough, manual submission template, photo requirements, DOB portal demo |
+| [DOB_Abatement_Flowchart.html](docs/DOB_Abatement_Flowchart.html) | Visual flowchart of the full abatement lifecycle (open in browser) |
+| [n8n-parser-workflow.json](docs/n8n-parser-workflow.json) | Original n8n proof-of-concept workflow (pre-SaaS) for PDF parsing and photo matching |
+| [sample-nois/](docs/sample-nois/) | Two real NOI PDFs for testing the parse pipeline |
+
+---
+
 ## 1. What This Is
 
 A SaaS platform that automates **DC Department of Buildings (DOB) Notice of Infraction (NOI)** processing for property managers. Upload an NOI PDF → AI extracts all violation data, evidence photos, and remediation tasks → dashboard tracks violations through the full abatement lifecycle.

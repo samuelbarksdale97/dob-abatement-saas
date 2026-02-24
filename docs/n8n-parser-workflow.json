@@ -1,0 +1,821 @@
+{
+  "name": "PDF Infraction Parser & Photo-Matching Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "Upload File to PDF.co",
+        "binaryData": true,
+        "binaryPropertyName": "file",
+        "name": "25NOIR-INS-07709_Owner_Email_45007"
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [
+        -912,
+        1408
+      ],
+      "id": "95fcd386-dc77-4760-8459-581bbef1aa54",
+      "name": "Upload file to PDFCo1",
+      "credentials": {
+        "pdfcoApi": {
+          "id": "9WbHEvPumCRbm7cG",
+          "name": "PDF.co account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "Convert from PDF",
+        "url": "={{ $json.url }}",
+        "advancedOptions": {}
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        1408
+      ],
+      "id": "326c67f2-42af-4e57-bd9d-e301a9733c83",
+      "name": "Grab it and convert it to text1",
+      "credentials": {
+        "pdfcoApi": {
+          "id": "9WbHEvPumCRbm7cG",
+          "name": "PDF.co account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        1680
+      ],
+      "id": "d859f56d-0546-4abc-8d9b-dc5623b882dc",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "EPtOAULOPJmfMG3J",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\"notice_level_data\": {\n\"notice_id\": \"25NOIR-INS-07709\",\n\"respondent\": \"YOKE LEBAUM LLC\",\n\"infraction_address\": \"557 LEBAUM ST SE, Unit:103\",\n\"date_of_service\": \"09/13/2025\",\n\"total_fines\": \"$4,499.00\"\n},\n\"work_orders\": [\n{\n\"item_number\": 1,\n\"violation_code\": \"12-G DCMR § 309.1\",\n\"priority\": 2,\n\"abatement_deadline\": \"60 Days\",\n\"fine\": \"$625.00\",\n\"violation_description\": \"Failure to promptly exterminate structures in which insects are found by approved processes\",\n\"specific_location\": \"Sleeping Room\",\n\"floor_number\": \"Interior\",\n\"date_of_infraction\": \"09/02/2025\",\n\"time_of_infraction\": \"10:24 PM\",\n\"task_description\": \"Provide extermination for insects bugs, and spiders. Provide documentation of service.\"\n},\n{\n\"item_number\": 2,\n\"violation_code\": \"IPMC § 502.1\",\n\"priority\": 2,\n\"abatement_deadline\": \"60 Days\",\n\"fine\": \"$625.00\",\n\"violation_description\": \"Failure to maintain bathtub, shower, lavatory, water closet or kitchen sink in a sanitary, safe working condition\",\n\"specific_location\": \"Bathroom\",\n\"floor_number\": \"Interior\",\n\"date_of_infraction\": \"09/02/2025\",\n\"time_of_infraction\": \"10:24 PM\",\n\"task_description\": \"Reglaze bathtub\"\n}\n]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        1664
+      ],
+      "id": "8a5081a3-b817-4ecf-9df8-85d304ae92d8",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n// \"Look back in time\" to get the prepared data\nconst inputData = $('Prepare jobs data').first().json; \n\nconst startPage = parseInt(inputData.start_page, 10);\nconst endPage = parseInt(inputData.end_page, 10);\nconst job_id = inputData.job_id;\n\n// This loop creates one item for each page\nfor (let i = startPage; i <= endPage; i++) {\n  items.push({\n    json: {\n      pageIndex: i - 1, // 0-based for PDF.co\n      pageNumber: i,    // 1-based for us\n      job_id: job_id // Pass the job_id along!\n    }\n  });\n}\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        1408
+      ],
+      "id": "93de6605-2254-4683-9d0a-139ee6e01665",
+      "name": "Generate Page loop numbers1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body }}\n\n---\n\nYou are an expert data extraction assistant. You will be given the full text from a Notice of Infraction PDF. Your job is to parse the *entire* document and extract two categories of information:\n\n1. **Notice-Level Data:** This is the general information about the notice, usually found on pages 1-4.\n2. **Work Orders:** This is the list of *all* individual infractions, usually starting with \"Item#:\" on pages 4-6.\n\nReturn *only* a single, valid JSON object with the following structure.\n\n---\n\nFIELDS TO EXTRACT:\n\n**1. `notice_level_data` (Object):**\n\n- `notice_id`: The \"Notice Number\" (e.g., \"25NOIR-INS-07709\").\n- `respondent`: The \"Respondent Name\" (e.g., \"YOKE LEBAUM LLC\").\n- `infraction_address`: The \"Location of Infraction\" (e.g., \"557 LEBAUM ST SE, Unit:103\").\n- `date_of_service`: The \"Date of Service\" (e.g., \"09/13/2025\").\n- `total_fines`: The \"Total Fines and Penalties\" (e.g., \"$4,499.00\").\n\n**2. `work_orders` (Array of Objects):**\n\n- Find *every* item starting with \"Item#:\". For each one, extract the following:\n- `item_number`: The number (e.g., 1, 2, 3...).\n- `violation_code`: The text in the \"D.C. Official Code...\" column (e.g., \"12-G DCMR § 309.1\").\n- `priority`: The number in the \"Priority\" column (e.g., 2).\n- `abatement_deadline`: The text in the \"Abate in\" column (e.g., \"60 Days\").\n- `fine`: The text in the \"Fine for Infraction\" column (e.g., \"$625.00\").\n- `violation_description`: The text under the \"Violation:\" heading (e.g., \"Failure to promptly exterminate...\").\n- `specific_location`: The text under the \"Location:\" heading (e.g., \"Sleeping Room\").\n- `floor_number`: The text under the \"Floor Number:\" heading (e.g., \"Interior\").\n- `date_of_infraction`: The \"Date of Infration\" (e.g., \"09/02/2025\").\n- `time_of_infraction`: The \"Time of Infraction\" (e.g., \"10:24 PM\").\n- `task_description`: This is the text under the \"Notes:\" heading. If there are multiple numbered notes, combine all of them into a single string.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a data extraction assistant. Please parse the text provided above, which comes from a Notice of Infraction PDF.\n\nFind all the individual infraction items listed (usually starting with \"Item#:\"). For each item, extract the following information:\n- item_number: The number (e.g., 1, 2, 3...)\n- violation_code: The code cited (e.g., \"12-G DCMR Â§ 309.1\", \"IPMC Â§ 502.1\")\n- task_description: The text under \"Notes:\" describing the work needed. If there are multiple numbered notes (like (1.), (2.)), combine them into one description.\n\nReturn the result ONLY as a valid JSON array named \"workOrders\". Each object in the array should represent one infraction item and have the keys \"item_number\", \"violation_code\", and \"task_description\".\n\nExample of expected JSON format:\n{\n  \"workOrders\": [\n    {\n      \"item_number\": 1,\n      \"violation_code\": \"12-G DCMR Â§ 309.1\",\n      \"task_description\": \"Provide extermination for insects bugs, and spiders. Provide documentation of service.\"\n    },\n    {\n      \"item_number\": 2,\n      \"violation_code\": \"IPMC Â§ 502.1\",\n      \"task_description\": \"Reglaze bathtub\"\n    }\n    // ... more items\n  ]\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        1408
+      ],
+      "id": "a2cbf471-9732-4374-b2c8-b5c00bf0c276",
+      "name": "Get Master List"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro-preview-06-05",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro-preview-06-05"
+        },
+        "text": "Analyze the attached image, which is a page from a Notice of Infraction. Extract the specific 'Violation Code' text (it might look like 'IPMC Â§ XXX.X' or 'XX-X DCMR Â§ XXX.X') shown on this page. Return only the code as a string, with no other text.",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        1408
+      ],
+      "id": "8d2ef740-a599-42bc-bd88-c3aba8808b87",
+      "name": "GetImageViolationCode",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oaSZvvSvfbXYHCtd",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7a74bffd-5d05-4a5d-ae41-3dc1ee2a4d62",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        1408
+      ],
+      "id": "5afdf225-8b11-4617-a1ba-120a1d533652",
+      "name": "Webhook",
+      "webhookId": "7a74bffd-5d05-4a5d-ae41-3dc1ee2a4d62"
+    },
+    {
+      "parameters": {
+        "operation": "Convert from PDF",
+        "url": "={{ $('Upload file to PDFCo1').first().json.url }}",
+        "convertType": "toJpg",
+        "advancedOptions_Image": {
+          "pages": "={{ JSON.stringify($json.pageIndex) }}"
+        }
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [
+        2432,
+        1408
+      ],
+      "id": "155be6ae-ea7b-4f9a-8c40-a40aa08b2986",
+      "name": "Convert to JPG",
+      "credentials": {
+        "pdfcoApi": {
+          "id": "9WbHEvPumCRbm7cG",
+          "name": "PDF.co account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "jobs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.job_update.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.job_update.status }}"
+            },
+            {
+              "fieldId": "respondent",
+              "fieldValue": "={{ $json.job_update.respondent }}"
+            },
+            {
+              "fieldId": "notice_id",
+              "fieldValue": "={{ $json.job_update.notice_id }}"
+            },
+            {
+              "fieldId": "infraction_address",
+              "fieldValue": "={{ $json.job_update.infraction_address }}"
+            },
+            {
+              "fieldId": "date_of_service",
+              "fieldValue": "={{ $json.job_update.date_of_service }}"
+            },
+            {
+              "fieldId": "total_fines",
+              "fieldValue": "={{ $json.job_update.total_fines }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        496,
+        1408
+      ],
+      "id": "399f51fc-b79f-4edb-9716-f11eecb10770",
+      "name": "Update jobs table",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the job_id from the VERY START of the workflow\nconst webhookBody = $('Webhook').first().json.body;\nconst job_id = webhookBody.job_id;\n\n// Get the AI output from the PREVIOUS node\nconst ai_output = $input.first().json.output;\nconst notice_data = ai_output.notice_level_data;\nconst work_orders = ai_output.work_orders;\n\n// 1. Prepare the 'jobs' table update\nconst jobUpdateData = {\n  ...notice_data,\n  status: 'PROCESSING',\n  id: job_id\n};\n\n// 2. Prepare the 'work_orders' array\n// We add the 'job_id' to each work order\nconst workOrdersData = work_orders.map(order => {\n  return {\n    ...order,\n    job_id: job_id\n  };\n});\n\n// 3. Return everything for the next nodes\nreturn {\n  job_update: jobUpdateData,\n  work_orders_insert: workOrdersData,\n  // Pass these through for the image loop\n  job_id: job_id,\n  start_page: webhookBody.start_page,\n  end_page: webhookBody.end_page\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1408
+      ],
+      "id": "18d3e88d-f45d-423e-a355-076acb64686e",
+      "name": "Prepare jobs data"
+    },
+    {
+      "parameters": {
+        "tableId": "work_orders",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "job_id",
+              "fieldValue": "={{ $json.job_id }}"
+            },
+            {
+              "fieldId": "item_number",
+              "fieldValue": "={{ $json.item_number }}"
+            },
+            {
+              "fieldId": "violation_code",
+              "fieldValue": "={{ $json.violation_code }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "abatement_deadline",
+              "fieldValue": "={{ $json.abatement_deadline }}"
+            },
+            {
+              "fieldId": "fine",
+              "fieldValue": "={{ $json.fine }}"
+            },
+            {
+              "fieldId": "violation_description",
+              "fieldValue": "={{ $json.violation_description }}"
+            },
+            {
+              "fieldId": "specific_location",
+              "fieldValue": "={{ $json.specific_location }}"
+            },
+            {
+              "fieldId": "floor_number",
+              "fieldValue": "={{ $json.floor_number }}"
+            },
+            {
+              "fieldId": "date_of_infraction",
+              "fieldValue": "={{ $json.date_of_infraction }}"
+            },
+            {
+              "fieldId": "task_description",
+              "fieldValue": "={{ $json.task_description }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        1408
+      ],
+      "id": "a3a08267-fb09-4d3c-ae4a-b96a8cbfbfd7",
+      "name": "Insert work order",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---===[ THIS IS THE FIX ]===---\n// Look \"back in time\" to the 'Prepare jobs data' node,\n// NOT at the input from the 'Update jobs table' node.\nconst input = $('Prepare jobs data').first().json;\n// ---===[ END OF FIX ]===---\n\n// Get the array of work orders\nconst workOrders = input.work_orders_insert;\n\n// We need to pass along the other data (like job_id)\nconst job_id = input.job_id; \n\n// Create a new list of items\nconst newItems = workOrders.map(order => {\n  // Each 'order' is one of the work_orders\n  return {\n    json: {\n      ...order, // This has all the work_order fields\n      job_id: job_id // We explicitly add the job_id\n    }\n  }\n});\n\n// Return the new list of items.\nreturn newItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        1408
+      ],
+      "id": "7a89a553-3c20-4a43-8fdf-75408b3f904f",
+      "name": "Un-Nest work orders"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        1408
+      ],
+      "id": "fc8f26be-8a23-4453-bd78-afb8a0266b5f",
+      "name": "Collect Work Orders"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "work_orders",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "keyValue": "={{ $('Generate Page loop numbers1').item.json.job_id }}"
+            },
+            {
+              "keyName": "violation_code",
+              "keyValue": "={{ $json.content.parts[0].text.trim() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        1408
+      ],
+      "id": "f7f7a314-ed2f-4e85-a727-8b93925e67fe",
+      "name": "Find work order id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vunvpgfgvzbjzfyckdth.supabase.co/storage/v1/object/evidence-images/job_{{ $('Generate Page loop numbers1').item.json.job_id }}/wo_{{ $json.id }}/page_{{ $('Generate Page loop numbers1').item.json.pageNumber }}.jpg",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4064,
+        1408
+      ],
+      "id": "fb9750a5-fd97-4317-b49e-f14988455e49",
+      "name": "Upload Evidence Image",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body[0] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        1408
+      ],
+      "id": "bd7fca1d-08b8-40b5-8034-a9a0278edea0",
+      "name": "Download JPGs"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Convert to JPG').item.json.body[0] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3792,
+        1408
+      ],
+      "id": "2bcc95fd-023f-43d9-a162-40d428f98c92",
+      "name": "Download JPGs again"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// const item = $input.first();\n\n// ---===[ THE FIX IS HERE ]===---\n\n// 1. Look back to 'Find work order id' to get the id\nconst workOrderId = $('Find work order id').item.json.id\n\n// 2. Look back to 'Generate Page loop' to get page number and job_id\n// const loopData = $('Generate Page loop numbers1').first().json;\nconst pageNumber = $('Generate Page loop numbers1').item.json.pageNumber;\nconst jobId = $('Generate Page loop numbers1').item.json.job_id;\n\n// 3. Re-build the storage path *without* the bucket prefix, as requested\nconst storagePath = `job_${jobId}/wo_${workOrderId}/page_${pageNumber}.jpg`;\n\n// ---===[ END OF FIX ]===---\n\n\n// Return a clean object for the final insert\nreturn {\n  json: {\n    work_order_id: workOrderId,\n    image_storage_path: storagePath, // This is our new, clean path\n    page_number: pageNumber\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4400,
+        1408
+      ],
+      "id": "6d81e576-292a-4efd-9497-032c17862c7a",
+      "name": "Prepare Image record"
+    },
+    {
+      "parameters": {
+        "tableId": "evidence_images",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "work_order_id",
+              "fieldValue": "={{ $json.work_order_id }}"
+            },
+            {
+              "fieldId": "image_storage_path",
+              "fieldValue": "={{ $json.image_storage_path }}"
+            },
+            {
+              "fieldId": "page_number",
+              "fieldValue": "={{ $json.page_number }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4672,
+        1408
+      ],
+      "id": "3d7d1086-1460-4720-956e-ed9de7bffbe0",
+      "name": "Insert `evidence images` Record",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4928,
+        1408
+      ],
+      "id": "3e35ef13-a927-4015-9729-af9c1c7d089b",
+      "name": "Collect Loop Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// We just need the data from the first item\nconst firstItem = $input.first().json;\n\n// We need to \"look back\" to get the job_id.\n// We'll look back to the node that *started* the loop.\nconst jobId = $('Generate Page loop numbers1', 0).first().json.job_id;\n\nreturn {\n  json: {\n    job_id: jobId\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5168,
+        1408
+      ],
+      "id": "bc078cc2-9706-49c1-a5a4-085475baecc5",
+      "name": "Get Finaly Job ID",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "jobs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.job_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "COMPLETED"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5392,
+        1408
+      ],
+      "id": "7c79e393-063c-40b1-bf1d-d6399a3c0040",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "JWeSeMKEbO1HDSjZ",
+          "name": "Lovable Real Estate"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload file to PDFCo1": {
+      "main": [
+        [
+          {
+            "node": "Grab it and convert it to text1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab it and convert it to text1": {
+      "main": [
+        [
+          {
+            "node": "Get Master List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Get Master List",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Get Master List",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Page loop numbers1": {
+      "main": [
+        [
+          {
+            "node": "Convert to JPG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Master List": {
+      "main": [
+        [
+          {
+            "node": "Prepare jobs data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetImageViolationCode": {
+      "main": [
+        [
+          {
+            "node": "Find work order id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Upload file to PDFCo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to JPG": {
+      "main": [
+        [
+          {
+            "node": "Download JPGs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare jobs data": {
+      "main": [
+        [
+          {
+            "node": "Update jobs table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update jobs table": {
+      "main": [
+        [
+          {
+            "node": "Un-Nest work orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert work order": {
+      "main": [
+        [
+          {
+            "node": "Collect Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Un-Nest work orders": {
+      "main": [
+        [
+          {
+            "node": "Insert work order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Work Orders": {
+      "main": [
+        [
+          {
+            "node": "Generate Page loop numbers1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find work order id": {
+      "main": [
+        [
+          {
+            "node": "Download JPGs again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download JPGs": {
+      "main": [
+        [
+          {
+            "node": "GetImageViolationCode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download JPGs again": {
+      "main": [
+        [
+          {
+            "node": "Upload Evidence Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Evidence Image": {
+      "main": [
+        [
+          {
+            "node": "Prepare Image record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Image record": {
+      "main": [
+        [
+          {
+            "node": "Insert `evidence images` Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert `evidence images` Record": {
+      "main": [
+        [
+          {
+            "node": "Collect Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Loop Items": {
+      "main": [
+        [
+          {
+            "node": "Get Finaly Job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Finaly Job ID": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5ad4fc0a-4c89-4f96-bece-27fedbb6bc73",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0a8b65fc334ad0a4759b64fae2492e7ca2d924cbadc09c7eb0f51079f3c31d2b"
+  },
+  "id": "qCkzSksbprgpc5hc",
+  "tags": []
+}
