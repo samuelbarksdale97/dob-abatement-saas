@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   ArrowLeft,
   MapPin,
@@ -17,8 +18,11 @@ import {
   Clock,
   User,
   Camera,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
-import type { Violation, ViolationItem, Photo, AuditLogEntry } from '@/lib/types';
+import { Progress } from '@/components/ui/progress';
+import type { Violation, ViolationItem, Photo, AuditLogEntry, WorkOrder } from '@/lib/types';
 import {
   STATUS_LABELS,
   STATUS_COLORS,
@@ -30,6 +34,7 @@ import {
 } from '@/lib/status-transitions';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
+import { AssignWorkOrderDialog } from '@/components/contractor/assign-work-order-dialog';
 
 const EvidencePhoto = dynamic(() => import('@/components/parser/evidence-photo').then(m => m.EvidencePhoto), {
   ssr: false,
@@ -40,6 +45,11 @@ const EvidencePhoto = dynamic(() => import('@/components/parser/evidence-photo')
   ),
 });
 
+const GeneratePdfButton = dynamic(
+  () => import('@/components/submission/generate-pdf-button').then(m => m.GeneratePdfButton),
+  { ssr: false },
+);
+
 export default function ViolationDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -49,18 +59,23 @@ export default function ViolationDetailPage() {
   const [items, setItems] = useState<ViolationItem[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const [contractorToken, setContractorToken] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       const supabase = createClient();
 
-      const [violationRes, itemsRes, photosRes, auditRes] = await Promise.all([
+      const [violationRes, itemsRes, photosRes, auditRes, workOrderRes] = await Promise.all([
         supabase.from('violations').select('*').eq('id', id).single(),
         supabase.from('violation_items').select('*').eq('violation_id', id).order('item_number'),
         supabase.from('photos').select('*').eq('violation_id', id).order('page_number'),
         supabase.from('audit_log').select('*').eq('record_id', id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('work_orders').select('*').eq('violation_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ]);
 
       if (violationRes.data) {
@@ -74,12 +89,72 @@ export default function ViolationDetailPage() {
         }
       }
       if (itemsRes.data) setItems(itemsRes.data as ViolationItem[]);
-      if (photosRes.data) setPhotos(photosRes.data as Photo[]);
+      if (photosRes.data) {
+        // Generate signed URLs for AFTER photos (contractor uploads)
+        const photosWithUrls = await Promise.all(
+          (photosRes.data as Photo[]).map(async (photo) => {
+            if (photo.photo_type === 'AFTER' && photo.storage_path) {
+              const { data: urlData } = await supabase.storage
+                .from('contractor-photos')
+                .createSignedUrl(photo.storage_path, 3600);
+
+              return {
+                ...photo,
+                signed_url: urlData?.signedUrl || null,
+              } as any;
+            }
+            return photo;
+          })
+        );
+        setPhotos(photosWithUrls);
+      }
       if (auditRes.data) setAuditLog(auditRes.data as AuditLogEntry[]);
+      if (workOrderRes.data) {
+        setWorkOrder(workOrderRes.data as WorkOrder);
+
+        // Fetch contractor token if work order exists
+        const tokenRes = await supabase
+          .from('contractor_tokens')
+          .select('token')
+          .eq('work_order_id', workOrderRes.data.id)
+          .is('revoked_at', null)
+          .maybeSingle();
+
+        if (tokenRes.data) {
+          setContractorToken(tokenRes.data.token);
+        }
+      }
       setLoading(false);
     };
     fetchData();
   }, [id]);
+
+  const handleAssignSuccess = async () => {
+    // Refetch work order, violation, and contractor token
+    const supabase = createClient();
+    const [workOrderRes, violationRes] = await Promise.all([
+      supabase.from('work_orders').select('*').eq('violation_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('violations').select('*').eq('id', id).single(),
+    ]);
+
+    if (workOrderRes.data) {
+      setWorkOrder(workOrderRes.data as WorkOrder);
+
+      // Fetch contractor token
+      const tokenRes = await supabase
+        .from('contractor_tokens')
+        .select('token')
+        .eq('work_order_id', workOrderRes.data.id)
+        .is('revoked_at', null)
+        .maybeSingle();
+
+      if (tokenRes.data) {
+        setContractorToken(tokenRes.data.token);
+      }
+    }
+
+    if (violationRes.data) setViolation(violationRes.data as Violation);
+  };
 
   // Group photos by violation_item_id for the Items tab
   const photosByItem = new Map<string, Photo[]>();
@@ -93,6 +168,31 @@ export default function ViolationDetailPage() {
       unmatchedPhotos.push(photo);
     }
   }
+
+  // Compute contractor repair progress (INSPECTOR photos with matching AFTER photos)
+  const inspectorPhotos = photos.filter(p => p.photo_type === 'INSPECTOR');
+  const afterPhotos = photos.filter(p => p.photo_type === 'AFTER');
+  const afterInspectorIds = new Set(
+    afterPhotos
+      .map(p => (p.metadata as Record<string, unknown>)?.inspector_photo_id as string | undefined)
+      .filter(Boolean),
+  );
+  // Track which items have at least one completed photo pair
+  const completedItemIds = new Set<string>();
+  // Count total required and completed
+  const totalInspectorPhotos = inspectorPhotos.length || items.length; // fallback to items if no inspectors
+  const completedInspectorPhotos = inspectorPhotos.length > 0
+    ? inspectorPhotos.filter(ip => afterInspectorIds.has(ip.id)).length
+    : afterPhotos.length; // legacy: count any AFTER photos
+  for (const [itemId, itemPhotos] of photosByItem.entries()) {
+    const itemInspectors = itemPhotos.filter(p => p.photo_type === 'INSPECTOR');
+    const allDone = itemInspectors.length > 0
+      ? itemInspectors.every(ip => afterInspectorIds.has(ip.id))
+      : itemPhotos.some(p => p.photo_type === 'AFTER');
+    if (allDone && itemInspectors.length > 0) completedItemIds.add(itemId);
+    else if (allDone && itemPhotos.some(p => p.photo_type === 'AFTER')) completedItemIds.add(itemId);
+  }
+  const progressPercent = totalInspectorPhotos > 0 ? Math.round((completedInspectorPhotos / totalInspectorPhotos) * 100) : 0;
 
   const handleStatusChange = async (newStatus: string) => {
     const res = await fetch('/api/violations', {
@@ -211,21 +311,140 @@ export default function ViolationDetailPage() {
           </Card>
         </div>
 
-        {/* Status actions */}
-        {nextStatuses.length > 0 && (
-          <div className="mb-6 flex gap-2">
-            {nextStatuses.map((status) => (
-              <Button
-                key={status}
-                variant="outline"
-                size="sm"
-                onClick={() => handleStatusChange(status)}
-              >
-                Move to {STATUS_LABELS[status]}
-              </Button>
-            ))}
-          </div>
+        {/* Work Order Section */}
+        {workOrder && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="h-4 w-4" />
+                Assigned Contractor
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Name</p>
+                  <p className="font-medium">{workOrder.contractor_name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Email</p>
+                  <p className="font-medium">{workOrder.contractor_email}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Phone</p>
+                  <p className="font-medium">{workOrder.contractor_phone || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <Badge className="mt-1">{workOrder.status}</Badge>
+                </div>
+                <div>
+                  <p className="text-gray-500">Due Date</p>
+                  <p className="font-medium">{workOrder.due_date ? new Date(workOrder.due_date).toLocaleDateString() : '—'}</p>
+                </div>
+                {workOrder.completed_at && (
+                  <div>
+                    <p className="text-gray-500">Completed</p>
+                    <p className="font-medium">{new Date(workOrder.completed_at).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Repair Progress */}
+              {items.length > 0 && (
+                <div className="mt-3 border-t pt-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">Repair Progress</p>
+                    <p className="text-sm text-gray-500">
+                      {completedInspectorPhotos} of {totalInspectorPhotos} photos
+                    </p>
+                  </div>
+                  <Progress value={progressPercent} className="h-2" />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {items.map((item) => {
+                      const done = completedItemIds.has(item.id);
+                      return (
+                        <span
+                          key={item.id}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          {done ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                          #{item.item_number}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {workOrder.notes && (
+                <div className="mt-3 border-t pt-3">
+                  <p className="text-gray-500 text-sm">Notes</p>
+                  <p className="text-sm">{workOrder.notes}</p>
+                </div>
+              )}
+              {contractorToken && (
+                <div className="mt-3 border-t pt-3">
+                  <p className="text-gray-500 text-sm mb-2">Contractor Access Link</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded bg-gray-100 px-3 py-2 text-xs break-all">
+                      {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'}/contractor/{contractorToken}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'}/contractor/${contractorToken}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success('Link copied to clipboard');
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
+
+        {/* Status actions */}
+        <div className="mb-6 flex gap-2">
+          {/* Assign Contractor button (only show if status allows and no work order) */}
+          {!workOrder && ['PARSED', 'ASSIGNED', 'IN_PROGRESS'].includes(violation.status) && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setAssignDialogOpen(true)}
+            >
+              <User className="mr-2 h-4 w-4" />
+              Assign Contractor
+            </Button>
+          )}
+
+          {nextStatuses.length > 0 && nextStatuses.map((status) => (
+            <Button
+              key={status}
+              variant="outline"
+              size="sm"
+              onClick={() => handleStatusChange(status)}
+            >
+              Move to {STATUS_LABELS[status]}
+            </Button>
+          ))}
+
+          {/* Generate Submission PDF */}
+          {['PHOTOS_UPLOADED', 'READY_FOR_SUBMISSION', 'SUBMITTED'].includes(violation.status) && (
+            <GeneratePdfButton
+              violation={violation}
+              items={items}
+              photos={photos}
+              pdfUrl={pdfUrl}
+            />
+          )}
+        </div>
 
         {/* Tabbed content */}
         <Tabs defaultValue="items">
@@ -274,25 +493,103 @@ export default function ViolationDetailPage() {
                     </div>
 
                     {/* Linked evidence photos */}
-                    {itemPhotos.length > 0 && pdfUrl && (
+                    {itemPhotos.length > 0 && (
                       <div className="mt-4 border-t pt-4">
-                        <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-gray-500">
-                          <Camera className="h-3.5 w-3.5" />
-                          Inspector Evidence — Page {itemPhotos.map(p => p.page_number).join(', ')}
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                          {itemPhotos.map((photo) => (
-                            <EvidencePhoto
-                              key={photo.id}
-                              pdfUrl={pdfUrl}
-                              pageNumber={photo.page_number!}
-                              width={240}
-                              description={
-                                (photo.metadata as Record<string, string>)?.description || undefined
-                              }
-                            />
-                          ))}
-                        </div>
+                        {/* Inspector Photos (BEFORE) */}
+                        {itemPhotos.filter(p => p.photo_type === 'INSPECTOR' && p.page_number).length > 0 && pdfUrl && (
+                          <div className="mb-4">
+                            <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                              <Camera className="h-3.5 w-3.5" />
+                              Before (Inspector) — Page {itemPhotos.filter(p => p.photo_type === 'INSPECTOR').map(p => p.page_number).join(', ')}
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              {itemPhotos.filter(p => p.photo_type === 'INSPECTOR').map((photo) => (
+                                <EvidencePhoto
+                                  key={photo.id}
+                                  pdfUrl={pdfUrl}
+                                  pageNumber={photo.page_number!}
+                                  width={240}
+                                  description={
+                                    (photo.metadata as Record<string, string>)?.description || undefined
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* AFTER Photos (Contractor Uploads) */}
+                        {itemPhotos.filter(p => p.photo_type === 'AFTER').length > 0 && (
+                          <div>
+                            <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-green-700">
+                              <Camera className="h-3.5 w-3.5" />
+                              After (Repair Complete) ✓
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              {itemPhotos.filter(p => p.photo_type === 'AFTER').map((photo) => {
+                                const photoAny = photo as any;
+                                const signedUrl = photoAny.signed_url;
+
+                                console.log('AFTER photo:', { id: photo.id, storage_path: photo.storage_path, signedUrl });
+
+                                return (
+                                  <div key={photo.id} className="relative group">
+                                    {signedUrl ? (
+                                      <img
+                                        src={signedUrl}
+                                        alt="After photo - repair completed"
+                                        className="h-60 w-auto rounded-lg border object-cover shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                                        onClick={() => setLightboxPhoto(signedUrl)}
+                                        onError={(e) => {
+                                          console.error('Image load error:', signedUrl);
+                                          const target = e.currentTarget;
+                                          target.style.display = 'none';
+                                          const errorDiv = document.createElement('div');
+                                          errorDiv.className = 'flex h-60 w-60 items-center justify-center rounded-lg border bg-red-50 p-4';
+                                          errorDiv.innerHTML = '<p class="text-xs text-red-600 text-center">Failed to load image</p>';
+                                          target.parentElement?.appendChild(errorDiv);
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="flex h-60 w-60 flex-col items-center justify-center gap-2 rounded-lg border bg-gray-50 p-4">
+                                        <Camera className="h-8 w-8 text-gray-400" />
+                                        <p className="text-center text-xs text-gray-600">
+                                          Photo uploaded
+                                        </p>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={async () => {
+                                            const supabase = createClient();
+                                            console.log('Fetching signed URL for:', photo.storage_path);
+                                            const { data, error } = await supabase.storage
+                                              .from('contractor-photos')
+                                              .createSignedUrl(photo.storage_path, 3600);
+
+                                            console.log('Signed URL result:', { data, error });
+
+                                            if (error) {
+                                              toast.error(`Failed to load photo: ${error.message}`);
+                                              return;
+                                            }
+
+                                            if (data?.signedUrl) {
+                                              window.open(data.signedUrl, '_blank');
+                                            } else {
+                                              toast.error('No signed URL returned');
+                                            }
+                                          }}
+                                        >
+                                          View Photo
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -388,6 +685,28 @@ export default function ViolationDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Assign Contractor Dialog */}
+      <AssignWorkOrderDialog
+        violation={violation}
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        onSuccess={handleAssignSuccess}
+      />
+
+      {/* Photo Lightbox */}
+      <Dialog open={!!lightboxPhoto} onOpenChange={() => setLightboxPhoto(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogTitle className="sr-only">After Photo</DialogTitle>
+          {lightboxPhoto && (
+            <img
+              src={lightboxPhoto}
+              alt="After photo - repair completed"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

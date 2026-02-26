@@ -169,6 +169,12 @@ export const parseNOI = inngest.createFunction(
         throw new Error(`Failed to update violation: ${updateError.message}`);
       }
 
+      // Delete any existing items from a previous run (idempotent on retry)
+      await supabase
+        .from('violation_items')
+        .delete()
+        .eq('violation_id', violationId);
+
       // Task: Insert violation items
       const items = work_orders.map(wo => ({
         org_id: orgId,
@@ -291,7 +297,7 @@ export const parseNOI = inngest.createFunction(
 
       const { data: items } = await supabase
         .from('violation_items')
-        .select('id, violation_code')
+        .select('id, violation_code, specific_location, task_description')
         .eq('violation_id', violationId);
 
       if (!items || items.length === 0) {
@@ -301,6 +307,13 @@ export const parseNOI = inngest.createFunction(
         });
         return;
       }
+
+      // Delete any existing photos from a previous run (idempotent on retry)
+      await supabase
+        .from('photos')
+        .delete()
+        .eq('violation_id', violationId)
+        .eq('photo_type', 'INSPECTOR');
 
       log.info('match_photos', `Found ${items.length} items to match against`, {
         item_codes: items.map(i => i.violation_code),
@@ -312,12 +325,49 @@ export const parseNOI = inngest.createFunction(
 
       const normalizeCode = (code: string) => code.replace(/\s+/g, ' ').trim().toLowerCase();
 
+      // Tokenize a string into lowercase words for similarity comparison
+      const tokenize = (text: string) =>
+        text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+
+      // Compute word-overlap similarity between two texts (Jaccard-like)
+      const textSimilarity = (a: string, b: string): number => {
+        const wordsA = new Set(tokenize(a));
+        const wordsB = new Set(tokenize(b));
+        if (wordsA.size === 0 || wordsB.size === 0) return 0;
+        let intersection = 0;
+        for (const w of wordsA) if (wordsB.has(w)) intersection++;
+        return intersection / Math.max(wordsA.size, wordsB.size);
+      };
+
       for (const page of pageAnalysis.pages) {
         if (!page.is_evidence_photo || !page.violation_code) continue;
 
-        const matchedItem = items.find(item =>
-          item.violation_code && normalizeCode(item.violation_code) === normalizeCode(page.violation_code!),
+        const normalizedPageCode = normalizeCode(page.violation_code);
+
+        // Find ALL items matching this code
+        const matchingItems = items.filter(item =>
+          item.violation_code && normalizeCode(item.violation_code) === normalizedPageCode,
         );
+
+        let matchedItem: typeof items[0] | null = null;
+        if (matchingItems.length === 1) {
+          matchedItem = matchingItems[0];
+        } else if (matchingItems.length > 1 && page.description) {
+          // Content-based matching: compare photo description against
+          // each item's task_description + specific_location
+          let bestScore = -1;
+          for (const item of matchingItems) {
+            const itemText = [item.task_description || '', item.specific_location || ''].join(' ');
+            const score = textSimilarity(page.description, itemText);
+            if (score > bestScore) {
+              bestScore = score;
+              matchedItem = item;
+            }
+          }
+        } else if (matchingItems.length > 1) {
+          // No description available, fall back to first match
+          matchedItem = matchingItems[0];
+        }
 
         matchLog.push({
           page: page.page_number,

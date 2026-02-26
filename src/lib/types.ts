@@ -125,6 +125,9 @@ export interface WorkOrder {
   org_id: string;
   violation_id: string;
   assigned_to: string | null;
+  contractor_name: string | null;
+  contractor_email: string | null;
+  contractor_phone: string | null;
   status: WorkOrderStatus;
   due_date: string | null;
   notes: string | null;
@@ -134,6 +137,35 @@ export interface WorkOrder {
   // Joined
   violation?: Violation;
   assigned_profile?: Profile;
+}
+
+export interface ContractorToken {
+  id: string;
+  org_id: string;
+  work_order_id: string;
+  token: string;
+  contractor_name: string;
+  contractor_email: string;
+  contractor_phone: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+  last_accessed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Contractor {
+  id: string;
+  org_id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  total_assignments: number;
+  last_assigned_at: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Submission {
