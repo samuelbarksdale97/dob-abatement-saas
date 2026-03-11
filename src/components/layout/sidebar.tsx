@@ -8,6 +8,7 @@ import {
   Upload,
   ClipboardList,
   LogOut,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +18,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/parse', label: 'Parse NOI', icon: FileUp },
   { href: '/import', label: 'CSV Import', icon: Upload },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar() {

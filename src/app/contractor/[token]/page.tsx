@@ -350,6 +350,8 @@ export default function ContractorViewPage() {
                               violationItemId={item.id}
                               photoType="AFTER"
                               inspectorPhotoId={inspectorPhoto.id}
+                              pdfUrl={pdf_url ?? undefined}
+                              inspectorPageNumber={inspectorPhoto.page_number ?? undefined}
                               existingPhoto={
                                 existingAfter && (existingAfter as any).signed_url
                                   ? { id: existingAfter.id, signed_url: (existingAfter as any).signed_url }

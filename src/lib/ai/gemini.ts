@@ -204,6 +204,97 @@ export interface AnalyzePagesResponse {
   };
 }
 
+// ============================================================
+// 3. PHOTO ANGLE VERIFICATION (before/after comparison)
+// ============================================================
+
+const ANGLE_VERIFICATION_PROMPT = `You are a construction photo verification specialist. You are comparing two photos of the same location:
+
+IMAGE 1 (INSPECTOR): A reference photo taken by a building inspector during a violation inspection.
+IMAGE 2 (CONTRACTOR): A completion photo taken by a contractor after repair work.
+
+Your job is to determine if the CONTRACTOR photo was taken from approximately the same camera angle, distance, and perspective as the INSPECTOR photo. This verifies the contractor actually photographed the same area/defect that was cited.
+
+EVALUATE these spatial factors:
+- Camera angle: Is the photographer standing in roughly the same position?
+- Distance: Is the subject roughly the same distance away?
+- Framing: Does the photo show the same area, wall, fixture, or structural element?
+- Perspective: Are vertical/horizontal lines similarly oriented?
+- Spatial relationships: Are objects/features in similar relative positions?
+
+INTENTIONALLY IGNORE these factors (they are expected to differ):
+- Lighting conditions (different time of day)
+- State of objects (repairs should change appearance)
+- Presence/absence of movable objects (furniture, tools, debris)
+- Color temperature or white balance
+- Image quality or resolution differences
+- Weather or seasonal differences (for exterior shots)
+
+Return this exact JSON:
+{
+  "isMatch": boolean,
+  "confidence": number (0-100),
+  "reasoning": "One sentence explaining why this is or isn't a match",
+  "details": "2-3 sentences with specific observations about angle, distance, framing"
+}
+
+A confidence >= 80 with isMatch=true means the photos show the same location from a sufficiently similar angle.
+A confidence < 80 or isMatch=false means the contractor should retake the photo with guidance from the reasoning field.`;
+
+export interface PhotoVerificationResult {
+  isMatch: boolean;
+  confidence: number;
+  reasoning: string;
+  details: string;
+}
+
+export interface VerifyPhotoResponse {
+  result: PhotoVerificationResult;
+  meta: {
+    model: string;
+    usage: GeminiUsage;
+  };
+}
+
+export async function verifyPhotoAngle(
+  afterImageBase64: string,
+  inspectorImageBase64: string,
+  afterMimeType: string = 'image/jpeg',
+): Promise<VerifyPhotoResponse> {
+  const model = 'gemini-2.5-flash';
+
+  const response = await getClient().models.generateContent({
+    model,
+    contents: [{
+      role: 'user',
+      parts: [
+        { inlineData: { mimeType: 'image/jpeg', data: inspectorImageBase64 } },
+        { inlineData: { mimeType: afterMimeType, data: afterImageBase64 } },
+        { text: ANGLE_VERIFICATION_PROMPT },
+      ],
+    }],
+    config: { responseMimeType: 'application/json' },
+  });
+
+  const usage = extractUsage(response);
+
+  const text = response.text;
+  if (!text) throw new Error('Gemini returned empty response for photo verification');
+
+  let result: PhotoVerificationResult;
+  try {
+    result = JSON.parse(text);
+  } catch (jsonErr) {
+    throw new Error(`Invalid JSON from photo verification: ${text.slice(0, 500)}`);
+  }
+
+  if (typeof result.isMatch !== 'boolean' || typeof result.confidence !== 'number') {
+    throw new Error(`Unexpected verification response shape: ${JSON.stringify(result).slice(0, 300)}`);
+  }
+
+  return { result, meta: { model, usage } };
+}
+
 export async function analyzePdfPages(pdfBuffer: Buffer): Promise<AnalyzePagesResponse> {
   const model = 'gemini-2.5-flash';
 
