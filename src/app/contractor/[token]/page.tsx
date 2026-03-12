@@ -215,14 +215,14 @@ export default function ContractorViewPage() {
     <div className="mx-auto max-w-4xl p-4 pb-20 sm:p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <Badge className="text-sm">{work_order.status.replace('_', ' ')}</Badge>
           <span className="text-sm text-gray-500">NOI {violation.notice_id}</span>
         </div>
-        <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">Work Order Assignment</h1>
+        <h1 className="mb-2 text-xl font-bold text-gray-900 sm:text-3xl">Work Order Assignment</h1>
         <div className="flex items-center gap-2 text-gray-600">
-          <MapPin className="h-5 w-5" />
-          <span className="font-medium">{violation.infraction_address}</span>
+          <MapPin className="h-5 w-5 shrink-0" />
+          <span className="break-words font-medium">{violation.infraction_address}</span>
         </div>
       </div>
 
@@ -255,7 +255,11 @@ export default function ContractorViewPage() {
       {/* Status Controls */}
       <div className="mb-6 flex gap-2">
         {work_order.status === 'ASSIGNED' && (
-          <Button onClick={() => handleStatusChange('IN_PROGRESS')} disabled={updatingStatus}>
+          <Button
+            onClick={() => handleStatusChange('IN_PROGRESS')}
+            disabled={updatingStatus}
+            className="min-h-[44px] min-w-[44px]"
+          >
             <PlayCircle className="mr-2 h-4 w-4" />
             Start Work
           </Button>
@@ -264,6 +268,7 @@ export default function ContractorViewPage() {
           <Button
             onClick={() => handleStatusChange('COMPLETED')}
             disabled={!allPhotosUploaded || updatingStatus}
+            className="min-h-[44px] min-w-[44px]"
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
             Mark Complete
@@ -327,7 +332,7 @@ export default function ContractorViewPage() {
                             {description && <span className="ml-1 font-normal">— {description}</span>}
                           </p>
                         )}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {/* Left: Before (Inspector) */}
                           <div>
                             <p className="mb-1 text-xs font-medium text-gray-500">

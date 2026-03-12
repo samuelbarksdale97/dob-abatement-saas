@@ -114,7 +114,27 @@ export async function POST(
       })
       .eq('id', photo_id);
 
-    // 8. Return verification result
+    // 8. Auto-progression: if all AFTER photos are approved, advance violation
+    if (isApproved) {
+      const { data: allAfterPhotos } = await supabase
+        .from('photos')
+        .select('id, status')
+        .eq('violation_id', workOrder.violation_id)
+        .eq('photo_type', 'AFTER');
+
+      if (allAfterPhotos && allAfterPhotos.length > 0) {
+        const allApproved = allAfterPhotos.every((p) => p.status === 'APPROVED');
+        if (allApproved) {
+          await supabase
+            .from('violations')
+            .update({ status: 'READY_FOR_SUBMISSION' })
+            .eq('id', workOrder.violation_id)
+            .in('status', ['PHOTOS_UPLOADED', 'AWAITING_PHOTOS', 'IN_PROGRESS']);
+        }
+      }
+    }
+
+    // 9. Return verification result
     return NextResponse.json({
       verification: {
         isMatch: result.isMatch,

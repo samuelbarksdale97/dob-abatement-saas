@@ -33,6 +33,7 @@ export function ParsedResults({ violationId }: ParsedResultsProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [merging, setMerging] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -107,8 +108,64 @@ export function ParsedResults({ violationId }: ParsedResultsProps) {
     return <p className="text-center text-gray-500">Violation not found.</p>;
   }
 
+  const parseMeta = violation.parse_metadata as Record<string, unknown>;
+  const duplicateDetected = parseMeta?.duplicate_detected === true;
+  const duplicateViolationId = parseMeta?.duplicate_violation_id as string | undefined;
+
+  const handleMerge = async () => {
+    if (!duplicateViolationId) return;
+    setMerging(true);
+    try {
+      const res = await fetch(`/api/violations/${duplicateViolationId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_violation_id: violationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Merge failed');
+      toast.success(`Merged: ${data.items_merged} new items, ${data.photos_merged} photos`);
+      router.push(`/dashboard/${duplicateViolationId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Merge failed');
+      setMerging(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Duplicate Warning */}
+      {duplicateDetected && duplicateViolationId && (
+        <Card className="border-orange-300 bg-orange-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-orange-600" />
+              <div className="flex-1">
+                <h4 className="font-medium text-orange-900">Duplicate NOI Detected</h4>
+                <p className="mt-1 text-sm text-orange-800">
+                  NOI <strong>{violation.notice_id}</strong> already exists in your system.
+                  You can merge new items into the existing violation or keep this as a separate record.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" onClick={handleMerge} disabled={merging}>
+                    {merging ? 'Merging...' : 'Merge Into Existing'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      toast.info('Kept as separate violation');
+                      router.push(`/dashboard/${violationId}`);
+                    }}
+                  >
+                    Keep Separate
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Notice-level info */}
       <Card>
         <CardHeader>
