@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { Camera, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'];
@@ -187,42 +188,43 @@ export function PhotoUploadSlot({
 
       {preview ? (
         // Thumbnail view
-        <div className="group relative">
+        <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm">
           <img
             src={preview}
             alt={`${photoType} photo`}
-            className="h-64 w-full rounded-lg border bg-gray-100 object-contain"
+            className="h-56 w-full bg-slate-100 object-cover"
           />
 
           {/* Overlay on hover */}
-          <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-900/40 opacity-0 transition-all duration-300 group-hover:opacity-100">
             <Button
               size="sm"
               variant="secondary"
+              className="rounded-xl font-semibold shadow-sm backdrop-blur-md bg-white/90 hover:bg-white text-slate-800"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading || verifying}
             >
               <Upload className="mr-2 h-4 w-4" />
-              Replace
+              Replace Photo
             </Button>
           </div>
 
           {/* Uploading overlay */}
           {uploading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/70">
-              <div className="text-center text-white">
-                <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <p className="text-sm">Uploading...</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+              <div className="text-center text-white flex flex-col items-center">
+                <div className="mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <p className="text-xs font-bold uppercase tracking-wider">Uploading...</p>
               </div>
             </div>
           )}
 
           {/* Verifying overlay */}
           {verifying && !uploading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
-              <div className="text-center text-white">
-                <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <p className="text-sm">Verifying angle...</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+              <div className="text-center text-white flex flex-col items-center">
+                <div className="mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <p className="text-xs font-bold uppercase tracking-wider">Verifying Match...</p>
               </div>
             </div>
           )}
@@ -233,36 +235,40 @@ export function PhotoUploadSlot({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex h-64 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 transition-colors hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="group flex h-56 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/80 hover:border-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Camera className="h-8 w-8 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">
-            Upload {photoType === 'BEFORE' ? 'Before' : 'After'} Photo
-          </span>
-          <span className="text-xs text-gray-400">Tap to capture or select</span>
+          <div className="bg-white p-3 rounded-full shadow-sm group-hover:scale-110 transition-transform duration-300">
+             <Camera className="h-6 w-6 text-slate-400 shrink-0 group-hover:text-slate-600 transition-colors" />
+          </div>
+          <div className="flex flex-col items-center gap-1">
+             <span className="text-sm font-bold text-slate-700">
+               Upload {photoType === 'BEFORE' ? 'Before' : 'After'} Photo
+             </span>
+             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tap to capture or select</span>
+          </div>
         </button>
       )}
 
       {/* Verification result badge */}
       {verificationResult && !verifying && (
-        <div className={`mt-2 rounded-lg border p-2.5 text-sm ${
+        <div className={`mt-3 rounded-xl border p-3 border-l-4 shadow-sm ${
           isVerified
-            ? 'border-green-200 bg-green-50 text-green-800'
-            : 'border-amber-200 bg-amber-50 text-amber-800'
+            ? 'border-emerald-200 border-l-emerald-500 bg-emerald-50/50'
+            : 'border-amber-200 border-l-amber-500 bg-amber-50/50'
         }`}>
-          <div className="flex items-center gap-1.5 font-medium">
+          <div className="flex items-center gap-2">
             {isVerified
-              ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+              ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
               : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
             }
-            <span>
+            <span className={cn("text-xs font-bold uppercase tracking-wider", isVerified ? "text-emerald-800" : "text-amber-800")}>
               {isVerified
-                ? `Angle Match (${verificationResult.confidence}%)`
-                : `Angle Mismatch (${verificationResult.confidence}%)`
+                ? `Angle Match (${Math.round(verificationResult.confidence)}%)`
+                : `Angle Mismatch (${Math.round(verificationResult.confidence)}%)`
               }
             </span>
           </div>
-          <p className="mt-1 text-xs opacity-80">{verificationResult.reasoning}</p>
+          <p className={cn("mt-1.5 text-xs font-medium leading-relaxed", isVerified ? "text-emerald-700/90" : "text-amber-700/90")}>{verificationResult.reasoning}</p>
         </div>
       )}
     </div>

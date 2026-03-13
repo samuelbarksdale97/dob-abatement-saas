@@ -110,31 +110,46 @@ export default function PropertyDetailPage() {
         </nav>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Building2 className="h-5 w-5 text-blue-500" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg border-slate-200/60 rounded-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
+              <Building2 className="h-24 w-24 text-slate-900" />
+            </div>
+            <CardContent className="flex items-center gap-4 p-6 relative z-10">
+              <div className="rounded-xl p-3 bg-blue-50 text-blue-600">
+                <Building2 className="h-6 w-6" />
+              </div>
               <div>
-                <p className="text-sm text-gray-500">Total Violations</p>
-                <p className="text-xl font-semibold">{detail.total_violations}</p>
+                <p className="text-sm font-medium text-slate-500 tracking-tight">Total Violations</p>
+                <p className="text-3xl font-bold tracking-tight text-slate-900">{detail.total_violations}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <DollarSign className="h-5 w-5 text-green-500" />
+          <Card className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg border-slate-200/60 rounded-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
+               <DollarSign className="h-24 w-24 text-slate-900" />
+             </div>
+            <CardContent className="flex items-center gap-4 p-6 relative z-10">
+              <div className="rounded-xl p-3 bg-emerald-50 text-emerald-600">
+                <DollarSign className="h-6 w-6" />
+              </div>
               <div>
-                <p className="text-sm text-gray-500">Total Fines</p>
-                <p className="text-xl font-semibold">${detail.total_fines.toLocaleString()}</p>
+                <p className="text-sm font-medium text-slate-500 tracking-tight">Total Fines</p>
+                <p className="text-3xl font-bold tracking-tight text-slate-900">${detail.total_fines.toLocaleString()}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+          <Card className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg border-slate-200/60 rounded-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
+                <AlertTriangle className="h-24 w-24 text-slate-900" />
+            </div>
+            <CardContent className="flex items-center gap-4 p-6 relative z-10">
+              <div className="rounded-xl p-3 bg-orange-50 text-orange-600">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
               <div>
-                <p className="text-sm text-gray-500">Unlinked</p>
-                <p className="text-xl font-semibold">{detail.unlinked_violations}</p>
+                <p className="text-sm font-medium text-slate-500 tracking-tight">Unlinked</p>
+                <p className="text-3xl font-bold tracking-tight text-slate-900">{detail.unlinked_violations}</p>
               </div>
             </CardContent>
           </Card>
@@ -159,21 +174,21 @@ export default function PropertyDetailPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {detail.units.map((unit) => (
               <Link key={unit.id} href={`/properties/${propertyId}/units/${unit.id}`}>
-                <Card className="transition-all hover:shadow-md">
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-semibold">Unit {unit.unit_number}</h3>
-                      <Badge variant={unit.is_vacant ? 'secondary' : 'outline'} className="text-xs">
+                <Card className="transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-slate-200/60 rounded-2xl group bg-white">
+                  <CardContent className="p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">Unit {unit.unit_number}</h3>
+                      <Badge variant={unit.is_vacant ? 'secondary' : 'outline'} className="text-[0.65rem] uppercase tracking-wider font-bold rounded-md">
                         {unit.is_vacant ? 'Vacant' : 'Occupied'}
                       </Badge>
                     </div>
                     {unit.occupant_name && (
-                      <p className="mb-2 text-sm text-gray-500">{unit.occupant_name}</p>
+                      <p className="mb-4 text-sm font-medium text-slate-500">{unit.occupant_name}</p>
                     )}
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center justify-between text-xs text-slate-500 font-medium border-t border-slate-100 pt-3 mt-auto">
                       <span>{unit.violation_count} violation{unit.violation_count !== 1 ? 's' : ''}</span>
                       {unit.worst_status && (
-                        <span className={`rounded-full px-2 py-0.5 ${STATUS_COLORS[unit.worst_status]}`}>
+                        <span className={`rounded-full px-2 py-1 bg-slate-100 ${STATUS_COLORS[unit.worst_status]}`}>
                           {STATUS_LABELS[unit.worst_status]}
                         </span>
                       )}

@@ -20,7 +20,9 @@ import {
   Camera,
   CheckCircle2,
   Circle,
+  Building2,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import type { Violation, ViolationItem, Photo, AuditLogEntry, WorkOrder } from '@/lib/types';
 import {
@@ -268,32 +270,32 @@ export default function ViolationDetailPage() {
       <Nav title={`Violation ${violation.notice_id || 'Detail'}`} />
       <div className="p-6">
         {/* Back button + header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/dashboard')}
-            className="mb-3"
+            className="mb-4 text-slate-500 hover:text-slate-900 transition-colors"
           >
-            <ArrowLeft className="mr-1 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
 
           <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900">
                 {violation.notice_id || 'Pending NOI'}
               </h2>
-              <p className="mt-1 flex items-center gap-1 text-gray-500">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-slate-500">
                 <MapPin className="h-4 w-4" />
                 {violation.infraction_address || 'Address pending'}
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className={STATUS_COLORS[violation.status]}>
+              <Badge className={cn("px-3 py-1 text-sm font-bold uppercase tracking-wider rounded-md", STATUS_COLORS[violation.status])}>
                 {STATUS_LABELS[violation.status]}
               </Badge>
-              <span className={`rounded px-2 py-1 text-sm font-medium ${getPriorityColor(violation.priority)}`}>
+              <span className={cn(`rounded-md px-3 py-1 text-sm font-bold uppercase tracking-wider uppercase`, getPriorityColor(violation.priority))}>
                 {getPriorityLabel(violation.priority)}
               </span>
             </div>
@@ -301,105 +303,105 @@ export default function ViolationDetailPage() {
         </div>
 
         {/* Key metrics */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-gray-500">Total Fines</p>
-              <p className="text-lg font-semibold text-red-600">
+        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <Card className="border-slate-200/60 shadow-sm rounded-xl">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Total Fines</p>
+              <p className="text-2xl font-bold tracking-tight text-red-600">
                 {violation.total_fines ? `$${violation.total_fines.toLocaleString()}` : '—'}
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-gray-500">Deadline</p>
-              <p className={`text-lg font-semibold ${urgencyColor}`}>
+          <Card className="border-slate-200/60 shadow-sm rounded-xl">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Deadline</p>
+              <p className={cn("text-2xl font-bold tracking-tight", urgencyColor)}>
                 {daysLeft !== null
                   ? daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d left`
                   : '—'}
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-gray-500">Violation Items</p>
-              <p className="text-lg font-semibold">{items.length}</p>
+          <Card className="border-slate-200/60 shadow-sm rounded-xl">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Items</p>
+              <p className="text-2xl font-bold tracking-tight text-slate-900">{items.length}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-gray-500">Photos</p>
-              <p className="text-lg font-semibold">{photos.length}</p>
+          <Card className="border-slate-200/60 shadow-sm rounded-xl">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Photos</p>
+              <p className="text-2xl font-bold tracking-tight text-slate-900">{photos.length}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-gray-500">Respondent</p>
-              <p className="text-sm font-medium truncate">{violation.respondent || '—'}</p>
+          <Card className="border-slate-200/60 shadow-sm rounded-xl">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Respondent</p>
+              <p className="text-sm font-semibold tracking-tight text-slate-700 truncate line-clamp-2 leading-tight">{violation.respondent || '—'}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Work Order Section */}
         {workOrder && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4" />
-                Assigned Contractor
+          <Card className="mb-8 border-slate-200/60 shadow-sm rounded-xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+              <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight text-slate-900">
+                <User className="h-5 w-5 text-blue-600" />
+                Assigned Contractor Work Order
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Name</p>
-                  <p className="font-medium">{workOrder.contractor_name}</p>
+            <CardContent className="p-6 space-y-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 text-sm">
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Name</p>
+                  <p className="font-semibold text-slate-900">{workOrder.contractor_name}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500">Email</p>
-                  <p className="font-medium">{workOrder.contractor_email}</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Email</p>
+                  <p className="font-medium text-slate-600 truncate">{workOrder.contractor_email}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500">Phone</p>
-                  <p className="font-medium">{workOrder.contractor_phone || '—'}</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Phone</p>
+                  <p className="font-medium text-slate-600">{workOrder.contractor_phone || '—'}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500">Status</p>
-                  <Badge className="mt-1">{workOrder.status}</Badge>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Status</p>
+                  <Badge variant="outline" className="w-fit bg-slate-50">{workOrder.status}</Badge>
                 </div>
-                <div>
-                  <p className="text-gray-500">Due Date</p>
-                  <p className="font-medium">{workOrder.due_date ? new Date(workOrder.due_date).toLocaleDateString() : '—'}</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</p>
+                  <p className="font-medium text-slate-600">{workOrder.due_date ? new Date(workOrder.due_date).toLocaleDateString() : '—'}</p>
                 </div>
                 {workOrder.completed_at && (
-                  <div>
-                    <p className="text-gray-500">Completed</p>
-                    <p className="font-medium">{new Date(workOrder.completed_at).toLocaleDateString()}</p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Completed</p>
+                    <p className="font-medium text-emerald-600">{new Date(workOrder.completed_at).toLocaleDateString()}</p>
                   </div>
                 )}
               </div>
 
               {/* Repair Progress */}
               {items.length > 0 && (
-                <div className="mt-3 border-t pt-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">Repair Progress</p>
-                    <p className="text-sm text-gray-500">
-                      {completedInspectorPhotos} of {totalInspectorPhotos} photos
+                <div className="rounded-xl border border-slate-100 p-5 bg-slate-50/50">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-bold tracking-tight text-slate-900">Repair Progress</p>
+                    <p className="text-xs font-medium text-slate-500">
+                      {completedInspectorPhotos} of {totalInspectorPhotos} photos verified
                     </p>
                   </div>
-                  <Progress value={progressPercent} className="h-2" />
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <Progress value={progressPercent} className="h-2.5 bg-slate-200" />
+                  <div className="mt-4 flex flex-wrap gap-2">
                     {items.map((item) => {
                       const done = completedItemIds.has(item.id);
                       return (
                         <span
                           key={item.id}
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                          }`}
+                          className={cn(`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium border`,
+                            done ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'
+                          )}
                         >
-                          {done ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                          {done ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Circle className="h-3.5 w-3.5 text-slate-300" />}
                           #{item.item_number}
                         </span>
                       );
@@ -408,44 +410,47 @@ export default function ViolationDetailPage() {
                 </div>
               )}
 
-              {workOrder.notes && (
-                <div className="mt-3 border-t pt-3">
-                  <p className="text-gray-500 text-sm">Notes</p>
-                  <p className="text-sm">{workOrder.notes}</p>
-                </div>
-              )}
-              {contractorToken && (
-                <div className="mt-3 border-t pt-3">
-                  <p className="text-gray-500 text-sm mb-2">Contractor Access Link</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded bg-gray-100 px-3 py-2 text-xs break-all">
-                      {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/{contractorToken}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/${contractorToken}`;
-                        navigator.clipboard.writeText(link);
-                        toast.success('Link copied to clipboard');
-                      }}
-                    >
-                      Copy
-                    </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                 {workOrder.notes && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Notes</p>
+                    <p className="text-sm text-slate-600 leading-relaxed italic bg-amber-50/50 border border-amber-100/50 p-4 rounded-xl">"{workOrder.notes}"</p>
                   </div>
-                </div>
-              )}
+                )}
+                {contractorToken && (
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contractor Access Portal Link</p>
+                    <div className="flex items-center gap-2 max-w-full">
+                      <code className="flex-1 rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs text-slate-600 break-all truncate">
+                        {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/{contractorToken}
+                      </code>
+                      <Button
+                        size="sm"
+                        className="rounded-xl shrink-0 h-[38px]"
+                        onClick={() => {
+                          const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/${contractorToken}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success('Link copied to clipboard');
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
 
         {/* Status actions */}
-        <div className="mb-6 flex gap-2">
+        <div className="mb-8 flex flex-wrap gap-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
           {/* Assign Contractor button (only show if status allows and no work order) */}
           {!workOrder && ['PARSED', 'ASSIGNED', 'IN_PROGRESS'].includes(violation.status) && (
             <Button
               variant="default"
               size="sm"
+              className="rounded-xl font-medium shadow-sm"
               onClick={() => setAssignDialogOpen(true)}
             >
               <User className="mr-2 h-4 w-4" />
@@ -458,6 +463,7 @@ export default function ViolationDetailPage() {
               key={status}
               variant="outline"
               size="sm"
+              className="rounded-xl border-slate-200 shadow-sm bg-white"
               onClick={() => handleStatusChange(status)}
             >
               Move to {STATUS_LABELS[status]}
@@ -489,37 +495,43 @@ export default function ViolationDetailPage() {
               const itemPhotos = photosByItem.get(item.id) || [];
               return (
                 <Card key={item.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                       <div className="flex-1">
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-500">#{item.item_number}</span>
-                          <Badge variant="outline" className="text-xs">{item.violation_code}</Badge>
-                          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${getPriorityColor(item.priority)}`}>
+                        <div className="mb-3 flex items-center gap-3">
+                          <span className="text-xl font-black tracking-tight text-slate-800">#{item.item_number}</span>
+                          <Badge variant="outline" className="text-xs font-semibold uppercase tracking-wider bg-slate-50">{item.violation_code}</Badge>
+                          <span className={cn(`rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wider`, getPriorityColor(item.priority))}>
                             P{item.priority}
                           </span>
                           {itemPhotos.length > 0 && (
-                            <span className="flex items-center gap-0.5 text-xs text-gray-400">
-                              <Camera className="h-3 w-3" />
-                              {itemPhotos.length}
+                            <span className="flex items-center gap-1 text-xs font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+                              <Camera className="h-3.5 w-3.5" />
+                              {itemPhotos.length} Photos
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-700">{item.violation_description}</p>
+                        <p className="text-sm font-medium text-slate-700 leading-relaxed max-w-2xl">{item.violation_description}</p>
                         {item.task_description && (
-                          <p className="mt-1 text-sm text-blue-700">
-                            <span className="font-medium">Fix: </span>{item.task_description}
-                          </p>
+                          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                            <p className="text-sm font-medium text-blue-800 leading-relaxed">
+                              <span className="font-bold uppercase tracking-wider text-xs text-blue-600 block mb-1">Required Fix</span>
+                              {item.task_description}
+                            </p>
+                          </div>
                         )}
-                        <div className="mt-2 flex gap-4 text-xs text-gray-400">
-                          <span>Location: {item.specific_location || '—'}</span>
-                          <span>Floor: {item.floor_number || '—'}</span>
-                          <span>Deadline: {item.abatement_deadline || '—'}</span>
+                        <div className="mt-5 flex flex-wrap gap-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {item.specific_location || '—'}</span>
+                          <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Floor {item.floor_number || '—'}</span>
+                          <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {item.abatement_deadline || '—'}</span>
                         </div>
                       </div>
-                      <p className="ml-4 font-semibold text-red-600">
-                        {item.fine ? `$${item.fine.toLocaleString()}` : '—'}
-                      </p>
+                      <div className="flex flex-col items-end gap-1">
+                         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Item Fine</span>
+                         <p className="text-2xl font-bold tracking-tight text-red-600">
+                           {item.fine ? `$${item.fine.toLocaleString()}` : '—'}
+                         </p>
+                      </div>
                     </div>
 
                     {/* Linked evidence photos */}

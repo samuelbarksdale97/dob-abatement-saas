@@ -44,27 +44,27 @@ export const STATUS_LABELS: Record<ViolationStatus, string> = {
 
 // Color classes for status badges
 export const STATUS_COLORS: Record<ViolationStatus, string> = {
-  NEW: 'bg-gray-100 text-gray-800',
-  PARSING: 'bg-blue-100 text-blue-800',
-  PARSED: 'bg-indigo-100 text-indigo-800',
-  ASSIGNED: 'bg-purple-100 text-purple-800',
-  IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
-  AWAITING_PHOTOS: 'bg-orange-100 text-orange-800',
-  PHOTOS_UPLOADED: 'bg-cyan-100 text-cyan-800',
-  READY_FOR_SUBMISSION: 'bg-teal-100 text-teal-800',
-  SUBMITTED: 'bg-blue-100 text-blue-800',
-  APPROVED: 'bg-green-100 text-green-800',
-  REJECTED: 'bg-red-100 text-red-800',
-  ADDITIONAL_INFO_REQUESTED: 'bg-amber-100 text-amber-800',
-  CLOSED: 'bg-gray-200 text-gray-600',
+  NEW: 'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20 font-medium',
+  PARSING: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 font-medium',
+  PARSED: 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20 font-medium',
+  ASSIGNED: 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/20 font-medium',
+  IN_PROGRESS: 'bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-600/20 font-medium',
+  AWAITING_PHOTOS: 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20 font-medium',
+  PHOTOS_UPLOADED: 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-600/20 font-medium',
+  READY_FOR_SUBMISSION: 'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-600/20 font-medium',
+  SUBMITTED: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 font-medium',
+  APPROVED: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 font-medium',
+  REJECTED: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 font-medium',
+  ADDITIONAL_INFO_REQUESTED: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 font-medium',
+  CLOSED: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20 font-medium',
 };
 
 // Priority display helpers
 export function getPriorityColor(priority: number): string {
   switch (priority) {
-    case 1: return 'text-red-600 bg-red-50';
-    case 2: return 'text-orange-600 bg-orange-50';
-    default: return 'text-gray-600 bg-gray-50';
+    case 1: return 'text-red-700 bg-red-50 ring-1 ring-inset ring-red-600/20';
+    case 2: return 'text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-600/20';
+    default: return 'text-slate-600 bg-slate-50 ring-1 ring-inset ring-slate-500/20';
   }
 }
 
@@ -79,15 +79,15 @@ export function getPriorityLabel(priority: number): string {
 // Urgency calculation for dashboard color coding
 export function getUrgencyColor(deadline: string | null, status: ViolationStatus): string {
   if (!deadline || ['APPROVED', 'CLOSED'].includes(status)) {
-    return 'text-gray-400';
+    return 'text-slate-400';
   }
   const daysRemaining = Math.ceil(
     (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
   if (daysRemaining < 0) return 'text-red-600 font-bold';
   if (daysRemaining <= 10) return 'text-orange-600 font-semibold';
-  if (daysRemaining <= 30) return 'text-yellow-600';
-  return 'text-green-600';
+  if (daysRemaining <= 30) return 'text-amber-600 font-medium';
+  return 'text-emerald-600 font-medium';
 }
 
 export function getDaysRemaining(deadline: string | null): number | null {
