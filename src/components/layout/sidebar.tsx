@@ -4,19 +4,27 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
+  Table,
   FileUp,
   Upload,
   ClipboardList,
   LogOut,
+  Settings,
+  Users,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Portfolio Home', icon: LayoutDashboard },
+  { href: '/violations', label: 'All Violations', icon: Table },
+  { href: '/contacts', label: 'Contacts', icon: Users },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/parse', label: 'Parse NOI', icon: FileUp },
   { href: '/import', label: 'CSV Import', icon: Upload },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar() {

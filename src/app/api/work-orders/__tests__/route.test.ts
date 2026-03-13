@@ -3,6 +3,18 @@ import { POST } from '../route';
 import { NextRequest } from 'next/server';
 import { mockViolation, mockProfile, mockWorkOrder } from '@/test/helpers/mock-data';
 
+// Helper: creates a chainable mock object for Supabase query builder
+function chainMock(resolveWith: { data: any; error: any }) {
+  const chain: any = {};
+  const methods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'in', 'is', 'gt', 'gte', 'lt', 'lte', 'order', 'limit', 'range'];
+  for (const m of methods) {
+    chain[m] = vi.fn(() => chain);
+  }
+  chain.single = vi.fn().mockResolvedValue(resolveWith);
+  chain.maybeSingle = vi.fn().mockResolvedValue(resolveWith);
+  return chain;
+}
+
 // Mock dependencies
 const mockFrom = vi.fn();
 const mockAuthGetUser = vi.fn();
@@ -17,17 +29,15 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }));
 
-// Mock Resend with a getter to avoid initialization order issues
+// Mock Resend
 const mockSendEmail = vi.fn();
-vi.mock('resend', () => {
-  return {
-    Resend: class {
-      get emails() {
-        return { send: mockSendEmail };
-      }
-    },
-  };
-});
+vi.mock('resend', () => ({
+  Resend: class {
+    get emails() {
+      return { send: mockSendEmail };
+    }
+  },
+}));
 
 vi.mock('@/lib/status-transitions', () => ({
   canTransition: vi.fn().mockReturnValue(true),
@@ -39,59 +49,53 @@ describe('POST /api/work-orders', () => {
   });
 
   it('creates work order with valid request', async () => {
-    // Mock auth user
     mockAuthGetUser.mockResolvedValue({
       data: { user: { id: 'user-123', email: 'pm@example.com' } },
       error: null,
     });
 
-    // Mock profile lookup (PM role)
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockProfile({ role: 'PROJECT_MANAGER' }),
-        error: null,
-      }),
-    });
+    // 1. Profile lookup
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockProfile({ role: 'PROJECT_MANAGER' }),
+      error: null,
+    }));
 
-    // Mock violation lookup
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockViolation({ status: 'PARSED' }),
-        error: null,
-      }),
-    });
+    // 2. Violation lookup
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockViolation({ status: 'PARSED' }),
+      error: null,
+    }));
 
-    // Mock work order insert
-    mockFrom.mockReturnValueOnce({
-      insert: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockWorkOrder(),
-        error: null,
-      }),
-    });
+    // 3. Contractor lookup (existing check)
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: null, // no existing contractor
+      error: null,
+    }));
 
-    // Mock contractor token insert
-    mockFrom.mockReturnValueOnce({
-      insert: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { id: 'token-123', token: 'abc-123' },
-        error: null,
-      }),
-    });
+    // 4. Contractor insert (new contractor)
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: null,
+      error: null,
+    }));
 
-    // Mock violation status update
-    mockFrom.mockReturnValueOnce({
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-    });
+    // 5. Work order insert
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockWorkOrder(),
+      error: null,
+    }));
 
-    // Mock email send
+    // 6. Contractor token insert
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: { id: 'token-123', token: 'abc-123' },
+      error: null,
+    }));
+
+    // 7. Violation status update
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: null,
+      error: null,
+    }));
+
     mockSendEmail.mockResolvedValue({ data: { id: 'email-123' }, error: null });
 
     const request = new NextRequest('http://localhost:3000/api/work-orders', {
@@ -119,15 +123,11 @@ describe('POST /api/work-orders', () => {
       error: null,
     });
 
-    // Mock profile lookup (will be called before validation)
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockProfile({ role: 'PROJECT_MANAGER' }),
-        error: null,
-      }),
-    });
+    // Profile lookup
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockProfile({ role: 'PROJECT_MANAGER' }),
+      error: null,
+    }));
 
     const request = new NextRequest('http://localhost:3000/api/work-orders', {
       method: 'POST',
@@ -169,14 +169,10 @@ describe('POST /api/work-orders', () => {
       error: null,
     });
 
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockProfile({ role: 'CONTRACTOR' }),
-        error: null,
-      }),
-    });
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockProfile({ role: 'CONTRACTOR' }),
+      error: null,
+    }));
 
     const request = new NextRequest('http://localhost:3000/api/work-orders', {
       method: 'POST',
@@ -198,23 +194,15 @@ describe('POST /api/work-orders', () => {
       error: null,
     });
 
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockProfile({ role: 'PROJECT_MANAGER' }),
-        error: null,
-      }),
-    });
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockProfile({ role: 'PROJECT_MANAGER' }),
+      error: null,
+    }));
 
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Not found' },
-      }),
-    });
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: null,
+      error: { message: 'Not found' },
+    }));
 
     const request = new NextRequest('http://localhost:3000/api/work-orders', {
       method: 'POST',
@@ -236,23 +224,15 @@ describe('POST /api/work-orders', () => {
       error: null,
     });
 
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockProfile({ role: 'PROJECT_MANAGER' }),
-        error: null,
-      }),
-    });
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockProfile({ role: 'PROJECT_MANAGER' }),
+      error: null,
+    }));
 
-    mockFrom.mockReturnValueOnce({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockViolation({ status: 'CLOSED' }),
-        error: null,
-      }),
-    });
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: mockViolation({ status: 'CLOSED' }),
+      error: null,
+    }));
 
     const request = new NextRequest('http://localhost:3000/api/work-orders', {
       method: 'POST',

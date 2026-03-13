@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Nav } from '@/components/layout/nav';
@@ -35,6 +35,7 @@ import {
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import { AssignWorkOrderDialog } from '@/components/contractor/assign-work-order-dialog';
+import { SubmissionTab } from '@/components/dashboard/submission-tab';
 
 const EvidencePhoto = dynamic(() => import('@/components/parser/evidence-photo').then(m => m.EvidencePhoto), {
   ssr: false,
@@ -66,68 +67,96 @@ export default function ViolationDetailPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const supabase = createClient();
+  const fetchData = useCallback(async () => {
+    const supabase = createClient();
 
-      const [violationRes, itemsRes, photosRes, auditRes, workOrderRes] = await Promise.all([
-        supabase.from('violations').select('*').eq('id', id).single(),
-        supabase.from('violation_items').select('*').eq('violation_id', id).order('item_number'),
-        supabase.from('photos').select('*').eq('violation_id', id).order('page_number'),
-        supabase.from('audit_log').select('*').eq('record_id', id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('work_orders').select('*').eq('violation_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      ]);
+    const [violationRes, itemsRes, photosRes, auditRes, workOrderRes] = await Promise.all([
+      supabase.from('violations').select('*').eq('id', id).single(),
+      supabase.from('violation_items').select('*').eq('violation_id', id).order('item_number'),
+      supabase.from('photos').select('*').eq('violation_id', id).order('page_number'),
+      supabase.from('audit_log').select('*').eq('record_id', id).order('created_at', { ascending: false }).limit(20),
+      supabase.from('work_orders').select('*').eq('violation_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
 
-      if (violationRes.data) {
-        setViolation(violationRes.data as Violation);
-        // Generate signed URL for the PDF
-        if (violationRes.data.pdf_storage_path) {
-          const { data: urlData } = await supabase.storage
-            .from('noi-pdfs')
-            .createSignedUrl(violationRes.data.pdf_storage_path, 3600);
-          if (urlData?.signedUrl) setPdfUrl(urlData.signedUrl);
-        }
+    if (violationRes.data) {
+      setViolation(violationRes.data as Violation);
+      // Generate signed URL for the PDF
+      if (violationRes.data.pdf_storage_path) {
+        const { data: urlData } = await supabase.storage
+          .from('noi-pdfs')
+          .createSignedUrl(violationRes.data.pdf_storage_path, 3600);
+        if (urlData?.signedUrl) setPdfUrl(urlData.signedUrl);
       }
-      if (itemsRes.data) setItems(itemsRes.data as ViolationItem[]);
-      if (photosRes.data) {
-        // Generate signed URLs for AFTER photos (contractor uploads)
-        const photosWithUrls = await Promise.all(
-          (photosRes.data as Photo[]).map(async (photo) => {
-            if (photo.photo_type === 'AFTER' && photo.storage_path) {
-              const { data: urlData } = await supabase.storage
-                .from('contractor-photos')
-                .createSignedUrl(photo.storage_path, 3600);
+    }
+    if (itemsRes.data) setItems(itemsRes.data as ViolationItem[]);
+    if (photosRes.data) {
+      // Generate signed URLs for AFTER photos (contractor uploads)
+      const photosWithUrls = await Promise.all(
+        (photosRes.data as Photo[]).map(async (photo) => {
+          if (photo.photo_type === 'AFTER' && photo.storage_path) {
+            const { data: urlData } = await supabase.storage
+              .from('contractor-photos')
+              .createSignedUrl(photo.storage_path, 3600);
 
-              return {
-                ...photo,
-                signed_url: urlData?.signedUrl || null,
-              } as any;
-            }
-            return photo;
-          })
-        );
-        setPhotos(photosWithUrls);
+            return {
+              ...photo,
+              signed_url: urlData?.signedUrl || null,
+            } as any;
+          }
+          return photo;
+        })
+      );
+      setPhotos(photosWithUrls);
+    }
+    if (auditRes.data) setAuditLog(auditRes.data as AuditLogEntry[]);
+    if (workOrderRes.data) {
+      setWorkOrder(workOrderRes.data as WorkOrder);
+
+      // Fetch contractor token if work order exists
+      const tokenRes = await supabase
+        .from('contractor_tokens')
+        .select('token')
+        .eq('work_order_id', workOrderRes.data.id)
+        .is('revoked_at', null)
+        .maybeSingle();
+
+      if (tokenRes.data) {
+        setContractorToken(tokenRes.data.token);
       }
-      if (auditRes.data) setAuditLog(auditRes.data as AuditLogEntry[]);
-      if (workOrderRes.data) {
-        setWorkOrder(workOrderRes.data as WorkOrder);
-
-        // Fetch contractor token if work order exists
-        const tokenRes = await supabase
-          .from('contractor_tokens')
-          .select('token')
-          .eq('work_order_id', workOrderRes.data.id)
-          .is('revoked_at', null)
-          .maybeSingle();
-
-        if (tokenRes.data) {
-          setContractorToken(tokenRes.data.token);
-        }
-      }
-      setLoading(false);
-    };
-    fetchData();
+    }
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Realtime subscription for live updates on this violation
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`violation-detail-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'violations', filter: `id=eq.${id}` },
+        () => fetchData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'photos', filter: `violation_id=eq.${id}` },
+        () => fetchData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'work_orders', filter: `violation_id=eq.${id}` },
+        () => fetchData(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, fetchData]);
 
   const handleAssignSuccess = async () => {
     // Refetch work order, violation, and contractor token
@@ -390,13 +419,13 @@ export default function ViolationDetailPage() {
                   <p className="text-gray-500 text-sm mb-2">Contractor Access Link</p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 rounded bg-gray-100 px-3 py-2 text-xs break-all">
-                      {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'}/contractor/{contractorToken}
+                      {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/{contractorToken}
                     </code>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'}/contractor/${contractorToken}`;
+                        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/${contractorToken}`;
                         navigator.clipboard.writeText(link);
                         toast.success('Link copied to clipboard');
                       }}
@@ -451,6 +480,7 @@ export default function ViolationDetailPage() {
           <TabsList>
             <TabsTrigger value="items">Items ({items.length})</TabsTrigger>
             <TabsTrigger value="photos">Photos ({photos.length})</TabsTrigger>
+            <TabsTrigger value="submissions">Submissions</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -658,6 +688,10 @@ export default function ViolationDetailPage() {
             ) : (
               <p className="py-8 text-center text-gray-500">No photos yet.</p>
             )}
+          </TabsContent>
+
+          <TabsContent value="submissions" className="mt-4">
+            <SubmissionTab violationId={violation.id} violationStatus={violation.status} />
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4">

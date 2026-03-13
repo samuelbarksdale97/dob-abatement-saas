@@ -97,13 +97,14 @@ describe('PhotoUploadSlot', () => {
   });
 
   it('validates file type (images only)', async () => {
-    const user = userEvent.setup();
     render(<PhotoUploadSlot {...defaultProps} />);
 
     const pdfFile = new File(['pdf'], 'doc.pdf', { type: 'application/pdf' });
     const input = screen.getByTestId('photo-input');
 
-    await user.upload(input, pdfFile);
+    // Use fireEvent directly to bypass the HTML accept attribute filtering
+    // (userEvent.upload respects accept="image/*" and silently drops non-matching files)
+    fireEvent.change(input, { target: { files: [pdfFile] } });
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith('error', expect.stringContaining('image'));

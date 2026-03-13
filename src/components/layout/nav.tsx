@@ -1,7 +1,6 @@
 'use client';
 
-import { Bell } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/layout/notification-bell';
 
 interface NavProps {
   title?: string;
@@ -14,9 +13,7 @@ export function Nav({ title }: NavProps) {
         {title || 'Dashboard'}
       </h1>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-gray-500" />
-        </Button>
+        <NotificationBell />
       </div>
     </header>
   );

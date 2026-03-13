@@ -5,6 +5,7 @@ import type {
   Photo,
   Profile,
   Organization,
+  Unit,
 } from '@/lib/types';
 
 export const mockOrganization = (overrides: Partial<Organization> = {}): Organization => ({
@@ -31,10 +32,25 @@ export const mockProfile = (overrides: Partial<Profile> = {}): Profile => ({
   ...overrides,
 });
 
+export const mockUnit = (overrides: Partial<Unit> = {}): Unit => ({
+  id: 'unit-123',
+  org_id: 'org-123',
+  property_id: 'prop-123',
+  unit_number: '201',
+  is_vacant: false,
+  occupant_name: 'Jane Tenant',
+  occupant_phone: '+1-202-555-0200',
+  notes: null,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  ...overrides,
+});
+
 export const mockViolation = (overrides: Partial<Violation> = {}): Violation => ({
   id: 'v-123',
   org_id: 'org-123',
   property_id: 'prop-123',
+  unit_id: null,
   notice_id: '24NOIR-INS-12345',
   respondent: 'Test Property LLC',
   infraction_address: '123 Main St NW, Washington, DC',

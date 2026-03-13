@@ -2,18 +2,27 @@
 
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { Camera, Upload, X } from 'lucide-react';
+import { Camera, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PhotoType } from '@/lib/types';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'];
+
+interface VerificationResult {
+  isMatch: boolean;
+  confidence: number;
+  reasoning: string;
+  details: string;
+  photo_id: string;
+}
 
 interface PhotoUploadSlotProps {
   token: string;
   violationItemId: string;
   photoType: 'BEFORE' | 'AFTER';
   inspectorPhotoId?: string;
+  pdfUrl?: string;
+  inspectorPageNumber?: number;
   existingPhoto?: {
     id: string;
     signed_url: string;
@@ -26,11 +35,15 @@ export function PhotoUploadSlot({
   violationItemId,
   photoType,
   inspectorPhotoId,
+  pdfUrl,
+  inspectorPageNumber,
   existingPhoto,
   onUploadComplete,
 }: PhotoUploadSlotProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(existingPhoto?.signed_url || null);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
@@ -45,6 +58,43 @@ export function PhotoUploadSlot({
     return null;
   };
 
+  const runVerification = async (photoId: string) => {
+    if (!pdfUrl || !inspectorPageNumber) return;
+
+    setVerifying(true);
+    try {
+      // Render the inspector PDF page to a data URL client-side
+      const { renderPdfPageToImage } = await import('@/lib/pdf/prepare-images');
+      const inspectorDataUrl = await renderPdfPageToImage(pdfUrl, inspectorPageNumber, 1.5);
+
+      // Call verification API
+      const verifyResponse = await fetch(`/api/contractor/${token}/photos/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photo_id: photoId,
+          inspector_image_data: inspectorDataUrl,
+        }),
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (verifyResponse.ok && verifyData.verification) {
+        setVerificationResult(verifyData.verification);
+        if (verifyData.verification.isMatch && verifyData.verification.confidence >= 80) {
+          toast.success(`Angle verified (${verifyData.verification.confidence}% match)`);
+        } else {
+          toast.warning('Angle mismatch — consider retaking from the same position as the inspector photo');
+        }
+      }
+    } catch (err) {
+      console.error('Verification error:', err);
+      toast.info('Photo uploaded. Angle verification unavailable.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -55,6 +105,9 @@ export function PhotoUploadSlot({
       toast.error(error);
       return;
     }
+
+    // Clear previous verification
+    setVerificationResult(null);
 
     // Show preview immediately
     const previewUrl = URL.createObjectURL(file);
@@ -97,6 +150,11 @@ export function PhotoUploadSlot({
         signed_url: data.signed_url,
         inspector_photo_id: inspectorPhotoId,
       });
+
+      // Trigger angle verification for AFTER photos with inspector pairing
+      if (photoType === 'AFTER' && pdfUrl && inspectorPageNumber && data.photo?.id) {
+        runVerification(data.photo.id);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to upload photo');
@@ -112,12 +170,7 @@ export function PhotoUploadSlot({
     }
   };
 
-  const handleClearPhoto = () => {
-    setPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+  const isVerified = verificationResult?.isMatch && verificationResult.confidence >= 80;
 
   return (
     <div className="relative">
@@ -128,7 +181,7 @@ export function PhotoUploadSlot({
         capture="environment"
         onChange={handleFileSelect}
         className="hidden"
-        disabled={uploading}
+        disabled={uploading || verifying}
         data-testid="photo-input"
       />
 
@@ -147,7 +200,7 @@ export function PhotoUploadSlot({
               size="sm"
               variant="secondary"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              disabled={uploading || verifying}
             >
               <Upload className="mr-2 h-4 w-4" />
               Replace
@@ -160,6 +213,16 @@ export function PhotoUploadSlot({
               <div className="text-center text-white">
                 <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 <p className="text-sm">Uploading...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Verifying overlay */}
+          {verifying && !uploading && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
+              <div className="text-center text-white">
+                <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <p className="text-sm">Verifying angle...</p>
               </div>
             </div>
           )}
@@ -178,6 +241,29 @@ export function PhotoUploadSlot({
           </span>
           <span className="text-xs text-gray-400">Tap to capture or select</span>
         </button>
+      )}
+
+      {/* Verification result badge */}
+      {verificationResult && !verifying && (
+        <div className={`mt-2 rounded-lg border p-2.5 text-sm ${
+          isVerified
+            ? 'border-green-200 bg-green-50 text-green-800'
+            : 'border-amber-200 bg-amber-50 text-amber-800'
+        }`}>
+          <div className="flex items-center gap-1.5 font-medium">
+            {isVerified
+              ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+              : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+            }
+            <span>
+              {isVerified
+                ? `Angle Match (${verificationResult.confidence}%)`
+                : `Angle Mismatch (${verificationResult.confidence}%)`
+              }
+            </span>
+          </div>
+          <p className="mt-1 text-xs opacity-80">{verificationResult.reasoning}</p>
+        </div>
       )}
     </div>
   );

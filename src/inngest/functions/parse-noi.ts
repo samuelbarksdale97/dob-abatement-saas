@@ -2,6 +2,7 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server';
 import { parseNOIPdf, analyzePdfPages } from '@/lib/ai/gemini';
 import { ParseLogger } from '@/lib/parse-logger';
+import { normalizeAddress, findMatchingProperty } from '@/lib/address-normalization';
 import type { ParseCosts } from '@/lib/ai/schemas';
 
 export const parseNOI = inngest.createFunction(
@@ -99,6 +100,46 @@ export const parseNOI = inngest.createFunction(
       );
 
       return geminiResult.parsed;
+    });
+
+    // ================================================================
+    // STEP 1.5: Duplicate Detection — Check if notice_id already exists
+    // ================================================================
+    const duplicateInfo = await step.run('check-duplicate', async () => {
+      const noticeId = aiResult.notice_level_data.notice_id;
+      if (!noticeId) return { isDuplicate: false, existingViolationId: null };
+
+      const { data: existing } = await supabase
+        .from('violations')
+        .select('id, notice_id, status')
+        .eq('org_id', orgId)
+        .eq('notice_id', noticeId)
+        .neq('id', violationId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        log.info('check_duplicate', 'Duplicate NOI detected', {
+          existing_violation_id: existing.id,
+          notice_id: noticeId,
+        });
+
+        // Store duplicate info in parse_metadata so the UI can show a warning
+        await supabase
+          .from('violations')
+          .update({
+            parse_metadata: {
+              ...((await supabase.from('violations').select('parse_metadata').eq('id', violationId).single()).data?.parse_metadata as Record<string, unknown> || {}),
+              duplicate_detected: true,
+              duplicate_violation_id: existing.id,
+            },
+          })
+          .eq('id', violationId);
+
+        return { isDuplicate: true, existingViolationId: existing.id };
+      }
+
+      return { isDuplicate: false, existingViolationId: null };
     });
 
     // ================================================================
@@ -228,7 +269,131 @@ export const parseNOI = inngest.createFunction(
     });
 
     // ================================================================
-    // STEP 3: Analyze Pages — Gemini identifies evidence photos per page
+    // STEP 3: Auto-Link Property & Unit — Match or create property/unit
+    // from the parsed infraction_address (BR-004)
+    // ================================================================
+    await step.run('auto-link-property', async () => {
+      await log.stepStart('auto_link', 'Matching violation to property and unit');
+
+      // Read the violation's infraction_address (set in insert-records step)
+      const { data: violation } = await supabase
+        .from('violations')
+        .select('infraction_address')
+        .eq('id', violationId)
+        .single();
+
+      const rawAddress = violation?.infraction_address;
+      if (!rawAddress) {
+        await log.stepComplete('auto_link', 'No infraction address — skipping property linking', {
+          passed: true,
+          checks: [{ name: 'address available', passed: false, detail: 'Skipped — no address' }],
+        });
+        return;
+      }
+
+      const { street, unit: unitNumber } = normalizeAddress(rawAddress);
+      log.info('auto_link', 'Normalized address', { raw: rawAddress, street, unit: unitNumber });
+
+      // Query existing properties for this org
+      const { data: existingProperties } = await supabase
+        .from('properties')
+        .select('id, address')
+        .eq('org_id', orgId);
+
+      let propertyId = findMatchingProperty(rawAddress, existingProperties || []);
+
+      // Create property if no match found
+      if (!propertyId) {
+        // Use the raw address (with proper casing) for display
+        // Extract city/state from address if present (often NOIs have "CITY, ST" at the end)
+        const { data: newProp, error: propError } = await supabase
+          .from('properties')
+          .insert({
+            org_id: orgId,
+            address: rawAddress.replace(/,?\s*unit[:\s]+\S+/i, '').replace(/,?\s*#\S+/, '').trim(),
+            city: '',
+            state: 'DC',
+          })
+          .select('id')
+          .single();
+
+        if (propError) {
+          log.error('auto_link', `Failed to create property: ${propError.message}`);
+        } else {
+          propertyId = newProp.id;
+          log.info('auto_link', 'Created new property', { property_id: propertyId });
+        }
+      } else {
+        log.info('auto_link', 'Matched existing property', { property_id: propertyId });
+      }
+
+      // Handle unit linking
+      let unitId: string | null = null;
+      if (propertyId && unitNumber) {
+        // Check if unit already exists
+        const { data: existingUnit } = await supabase
+          .from('units')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('unit_number', unitNumber)
+          .maybeSingle();
+
+        if (existingUnit) {
+          unitId = existingUnit.id;
+          log.info('auto_link', 'Matched existing unit', { unit_id: unitId, unit_number: unitNumber });
+        } else {
+          const { data: newUnit, error: unitError } = await supabase
+            .from('units')
+            .insert({
+              org_id: orgId,
+              property_id: propertyId,
+              unit_number: unitNumber,
+            })
+            .select('id')
+            .single();
+
+          if (unitError) {
+            log.error('auto_link', `Failed to create unit: ${unitError.message}`);
+          } else {
+            unitId = newUnit.id;
+            log.info('auto_link', 'Created new unit', { unit_id: unitId, unit_number: unitNumber });
+          }
+        }
+      }
+
+      // Update violation with property_id and unit_id
+      if (propertyId) {
+        const updateFields: Record<string, string | null> = { property_id: propertyId };
+        if (unitId) updateFields.unit_id = unitId;
+
+        const { error: linkError } = await supabase
+          .from('violations')
+          .update(updateFields)
+          .eq('id', violationId);
+
+        if (linkError) {
+          log.error('auto_link', `Failed to link violation: ${linkError.message}`);
+        }
+      }
+
+      await log.stepComplete(
+        'auto_link',
+        propertyId
+          ? `Linked to property${unitId ? ` + unit ${unitNumber}` : ''}`
+          : 'Could not link to property',
+        {
+          passed: !!propertyId,
+          checks: [
+            { name: 'property linked', passed: !!propertyId, detail: propertyId || 'none' },
+            { name: 'unit linked', passed: !!unitId, detail: unitId ? `unit ${unitNumber}` : 'no unit in address' },
+          ],
+        },
+      );
+    });
+
+    // ================================================================
+    // STEP 4: Analyze Pages — Gemini identifies evidence photos per page
+    // (was Step 3 before auto-link was added)
     // ================================================================
     const pageAnalysis = await step.run('analyze-pages', async () => {
       await log.stepStart('analyze_pages', 'Sending PDF to Gemini for page-level analysis');
@@ -290,7 +455,7 @@ export const parseNOI = inngest.createFunction(
     });
 
     // ================================================================
-    // STEP 4: Match Photos — Link evidence photos to violation items
+    // STEP 5: Match Photos — Link evidence photos to violation items
     // ================================================================
     await step.run('match-photos', async () => {
       await log.stepStart('match_photos', 'Matching evidence photos to violation items by code');
@@ -421,7 +586,7 @@ export const parseNOI = inngest.createFunction(
     });
 
     // ================================================================
-    // STEP 5: Mark Complete — Final verification
+    // STEP 6: Mark Complete — Final verification
     // ================================================================
     await step.run('mark-complete', async () => {
       await log.stepStart('complete', 'Finalizing parse');
