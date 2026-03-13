@@ -24,10 +24,10 @@ export default function ParsePage() {
   return (
     <div>
       <Nav title="Parse NOI PDF" />
-      <div className="mx-auto max-w-2xl p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-gray-900">Upload NOI Document</h2>
-          <p className="mt-1 text-sm text-gray-500">
+      <div className="mx-auto max-w-3xl p-6 sm:p-10">
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl font-black tracking-tight text-slate-900">Upload NOI Document</h2>
+          <p className="mt-2 text-base font-medium text-slate-500 max-w-xl mx-auto">
             Upload a Notice of Infraction PDF and our AI will extract all violation data automatically.
           </p>
         </div>

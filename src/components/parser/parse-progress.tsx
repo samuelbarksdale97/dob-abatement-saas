@@ -186,34 +186,34 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
   const isComplete = parseStatus === 'completed';
 
   return (
-    <div className={`rounded-xl border bg-white p-6 transition-colors ${
-      isFailed ? 'border-red-300 bg-red-50/30' : ''
+    <div className={`rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-sm transition-colors ${
+      isFailed ? 'border-red-300 bg-red-50/50' : ''
     }`}>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between border-b border-slate-100 pb-5">
         <div>
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-2xl font-black tracking-tight text-slate-900">
             {isFailed ? 'Parse Failed' :
              isComplete ? 'Parse Complete!' :
              'AI Processing Your NOI...'}
           </h3>
           {!isFailed && !isComplete && (
-            <p className="text-sm text-gray-500">This typically takes 30-60 seconds</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">This typically takes 30-60 seconds</p>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-sm text-gray-400">
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-inner">
           <Clock className="h-4 w-4" />
-          <span className="tabular-nums">{formatSeconds(elapsed)}</span>
+          <span className="tabular-nums tracking-wider">{formatSeconds(elapsed)}</span>
         </div>
       </div>
 
       {/* Overall Progress Bar */}
-      <div className="mb-6">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700">Overall Progress</span>
-          <span className="tabular-nums text-gray-500">{Math.round(progress)}%</span>
+      <div className="mb-10">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+          <span className="text-slate-500">Overall Progress</span>
+          <span className="tabular-nums text-slate-400">{Math.round(progress)}%</span>
         </div>
-        <Progress value={progress} className="h-2.5" />
+        <Progress value={progress} className="h-3 rounded-full bg-slate-100 border border-slate-200/60 shadow-inner" />
       </div>
 
       {/* Step Timeline */}
@@ -228,61 +228,61 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
           const StepIcon = config?.icon || Circle;
 
           return (
-            <div key={step.step} className="relative flex gap-4 pb-6 last:pb-0">
+            <div key={step.step} className="relative flex gap-5 pb-8 last:pb-0">
               {/* Vertical connecting line */}
               {!isLast && (
-                <div className={`absolute left-[15px] top-[32px] h-[calc(100%-16px)] w-0.5 transition-colors duration-500 ${
-                  isDone ? 'bg-green-300' : 'bg-gray-200'
+                <div className={`absolute left-[19px] top-[38px] h-[calc(100%-24px)] w-[3px] rounded-full transition-colors duration-500 ${
+                  isDone ? 'bg-emerald-300' : 'bg-slate-200'
                 }`} />
               )}
 
               {/* Step icon circle */}
-              <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 ${
-                isDone ? 'border-green-500 bg-green-50' :
-                isActive ? 'animate-breathe border-blue-500 bg-blue-50' :
+              <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 shadow-sm ${
+                isDone ? 'border-emerald-500 bg-emerald-50' :
+                isActive ? 'animate-breathe border-blue-500 bg-blue-50/80 shadow-blue-100' :
                 isStepFailed ? 'border-red-500 bg-red-50' :
-                'border-gray-200 bg-white'
+                'border-slate-200 bg-slate-50'
               }`}>
-                {isDone && <CheckCircle className="h-5 w-5 text-green-500" />}
-                {isActive && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
-                {isStepFailed && <XCircle className="h-5 w-5 text-red-500" />}
-                {isPending && <StepIcon className="h-4 w-4 text-gray-300" />}
+                {isDone && <CheckCircle className="h-5 w-5 text-emerald-600" />}
+                {isActive && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+                {isStepFailed && <XCircle className="h-5 w-5 text-red-600" />}
+                {isPending && <StepIcon className="h-4 w-4 text-slate-300" />}
               </div>
 
               {/* Step content */}
-              <div className={`flex-1 transition-opacity duration-500 ${
+              <div className={`flex-1 transition-opacity duration-500 pt-1 ${
                 isPending ? 'opacity-40' : 'opacity-100'
               }`}>
-                <div className="flex items-center gap-2">
-                  <p className={`text-sm font-semibold ${
+                <div className="flex items-center gap-3">
+                  <p className={`text-base font-bold tracking-tight ${
                     isActive ? 'text-blue-700' :
-                    isDone ? 'text-green-700' :
+                    isDone ? 'text-emerald-700' :
                     isStepFailed ? 'text-red-700' :
-                    'text-gray-400'
+                    'text-slate-400'
                   }`}>
                     {config?.label || step.step}
                   </p>
                   {/* Duration badge for completed steps */}
                   {isDone && step.started_at && step.completed_at && (
-                    <Badge variant="outline" className="text-xs text-gray-400">
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 border-emerald-200 bg-emerald-50">
                       {formatDuration(step.started_at, step.completed_at)}
                     </Badge>
                   )}
                   {/* Elapsed badge for running step */}
                   {isActive && step.started_at && (
-                    <Badge variant="outline" className="animate-pulse text-xs text-blue-400">
+                    <Badge variant="outline" className="animate-pulse text-[10px] uppercase font-bold tracking-wider text-blue-600 border-blue-200 bg-blue-50">
                       {formatStepElapsed(step.started_at)}
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="mt-1 text-sm font-medium text-slate-500">
                   {step.message || config?.description}
                 </p>
                 {/* Error display */}
                 {isStepFailed && (step.error || step.message) && (
-                  <div className="mt-2 flex items-start gap-2 rounded-md bg-red-50 p-2">
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-50/80 border border-red-100 p-3 shadow-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                    <p className="text-xs text-red-600">{step.error || step.message}</p>
+                    <p className="text-sm font-medium text-red-700 leading-snug">{step.error || step.message}</p>
                   </div>
                 )}
               </div>
@@ -294,40 +294,40 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
       {/* Live Data Preview Cards */}
       {metadata && (metadata.items_found != null || metadata.total_pages != null || metadata.photos_matched != null || metadata.costs) && (
         <>
-          <Separator className="my-5" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Separator className="my-8 border-slate-100" />
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
             {metadata.items_found != null && (
-              <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <CardContent className="flex flex-col items-center p-4">
-                  <span className="text-2xl font-bold text-blue-600">{metadata.items_found}</span>
-                  <span className="text-xs text-gray-500">Violations Found</span>
+              <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 border-slate-200/60 shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6 bg-blue-50/30">
+                  <span className="text-3xl font-black tracking-tight text-blue-600 mb-1">{metadata.items_found}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Violations Found</span>
                 </CardContent>
               </Card>
             )}
             {metadata.total_pages != null && (
-              <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <CardContent className="flex flex-col items-center p-4">
-                  <span className="text-2xl font-bold text-indigo-600">{metadata.total_pages}</span>
-                  <span className="text-xs text-gray-500">Pages Analyzed</span>
+              <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 border-slate-200/60 shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6 bg-indigo-50/30">
+                  <span className="text-3xl font-black tracking-tight text-indigo-600 mb-1">{metadata.total_pages}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Pages Analyzed</span>
                 </CardContent>
               </Card>
             )}
             {metadata.photos_matched != null && (
-              <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <CardContent className="flex flex-col items-center p-4">
-                  <span className="text-2xl font-bold text-green-600">{metadata.photos_matched}</span>
-                  <span className="text-xs text-gray-500">Photos Matched</span>
+              <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 border-slate-200/60 shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6 bg-emerald-50/30">
+                  <span className="text-3xl font-black tracking-tight text-emerald-600 mb-1">{metadata.photos_matched}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Photos Matched</span>
                 </CardContent>
               </Card>
             )}
             {metadata.costs && (metadata.costs.ai_parse || metadata.costs.analyze_pages) && (
-              <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <CardContent className="flex flex-col items-center p-4">
-                  <span className="flex items-center text-2xl font-bold text-amber-600">
-                    <DollarSign className="h-5 w-5" />
-                    {(metadata.costs.total_usd ?? ((metadata.costs.ai_parse?.cost_usd ?? 0) + (metadata.costs.analyze_pages?.cost_usd ?? 0))).toFixed(4)}
+              <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 border-slate-200/60 shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6 bg-amber-50/30">
+                  <span className="flex items-center text-3xl font-black tracking-tight text-amber-600 mb-1">
+                    <span className="text-xl -mt-1 mr-0.5">$</span>
+                    {(metadata.costs.total_usd ?? ((metadata.costs.ai_parse?.cost_usd ?? 0) + (metadata.costs.analyze_pages?.cost_usd ?? 0))).toFixed(3).replace(/^0+/, '')}
                   </span>
-                  <span className="text-xs text-gray-500">AI Cost</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">AI Cost</span>
                 </CardContent>
               </Card>
             )}
@@ -337,9 +337,9 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
       {/* Completion celebration */}
       {isComplete && (
-        <div className="mt-6 flex items-center justify-center gap-2 animate-in fade-in duration-700">
-          <CheckCircle className="h-6 w-6 text-green-500" />
-          <span className="text-lg font-semibold text-green-700">All done! Loading results...</span>
+        <div className="mt-8 flex items-center justify-center gap-3 animate-in fade-in duration-700 bg-emerald-50 border border-emerald-200 p-4 rounded-xl shadow-sm">
+          <CheckCircle className="h-6 w-6 text-emerald-600" />
+          <span className="text-lg font-bold tracking-tight text-emerald-900">All done! Loading results...</span>
         </div>
       )}
 

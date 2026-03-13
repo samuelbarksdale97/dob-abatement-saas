@@ -5,6 +5,7 @@ import { FileUp, File, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface UploadZoneProps {
   onUploadComplete: (violationId: string) => void;
@@ -92,44 +93,49 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 max-w-2xl mx-auto w-full">
       <div
         onDrop={handleDrop}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
+        className={cn(
+          "group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 transition-all duration-300",
           dragOver
-            ? 'border-blue-400 bg-blue-50'
+            ? "border-blue-400 bg-blue-50/80 scale-[1.02] shadow-lg shadow-blue-100/50"
             : file
-            ? 'border-green-300 bg-green-50'
-            : 'border-gray-300 bg-white hover:border-gray-400'
-        }`}
+            ? "border-emerald-300 bg-emerald-50/50"
+            : "border-slate-300 bg-slate-50/50 hover:border-slate-400 hover:bg-slate-100/50 hover:shadow-sm"
+        )}
       >
         {file ? (
-          <div className="flex items-center gap-3">
-            <File className="h-8 w-8 text-green-600" />
-            <div>
-              <p className="font-medium text-gray-900">{file.name}</p>
-              <p className="text-sm text-gray-500">{(file.size / 1024).toFixed(0)} KB</p>
+          <div className="flex items-center gap-4 bg-white p-4 pr-5 rounded-xl border border-emerald-100 shadow-sm transition-all">
+            <div className="bg-emerald-100 p-2.5 rounded-lg shrink-0">
+               <File className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-800 tracking-tight truncate">{file.name}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-0.5">{(file.size / 1024).toFixed(0)} KB</p>
             </div>
             <button
-              onClick={() => setFile(null)}
-              className="ml-4 rounded-full p-1 hover:bg-gray-100"
+              onClick={(e) => { e.stopPropagation(); setFile(null); }}
+              className="ml-2 rounded-full p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
             >
-              <X className="h-4 w-4 text-gray-400" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         ) : (
           <>
-            <FileUp className="mb-4 h-12 w-12 text-gray-400" />
-            <p className="mb-2 text-lg font-medium text-gray-700">
-              Drop your NOI PDF here
+            <div className="bg-white p-4 rounded-full shadow-sm mb-5 group-hover:-translate-y-1 transition-transform duration-300">
+               <FileUp className="h-10 w-10 text-slate-400 group-hover:text-blue-500 transition-colors" />
+            </div>
+            <p className="mb-2 text-xl font-bold tracking-tight text-slate-800">
+              Drag & Drop your NOI PDF here
             </p>
-            <p className="mb-4 text-sm text-gray-500">
-              or click to browse files
+            <p className="mb-6 text-sm font-medium text-slate-500">
+              or click below to browse your files
             </p>
             <label className="cursor-pointer">
-              <span className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              <span className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all focus:ring-2 focus:ring-slate-300 inline-block">
                 Choose File
               </span>
               <input
@@ -144,22 +150,28 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
       </div>
 
       {file && (
-        <div className="space-y-3">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {uploading && (
-            <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-full rounded-full bg-blue-600 transition-all duration-500"
-                style={{ width: `${uploadProgress}%` }}
-              />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
+                 <span>{uploadProgress < 100 ? 'Uploading & Parsing...' : 'Processing Complete'}</span>
+                 <span>{uploadProgress}%</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 border border-slate-200/60 shadow-inner">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
           <Button
             onClick={handleUpload}
             disabled={uploading}
-            className="w-full"
+            className="w-full h-14 rounded-xl text-base font-bold shadow-md hover:scale-[1.02] transition-all bg-slate-900 hover:bg-slate-800 disabled:hover:scale-100"
             size="lg"
           >
-            {uploading ? 'Uploading & Starting Parse...' : 'Upload & Parse NOI'}
+            {uploading ? 'Processing NOI Document...' : 'Upload & Parse NOI'}
           </Button>
         </div>
       )}

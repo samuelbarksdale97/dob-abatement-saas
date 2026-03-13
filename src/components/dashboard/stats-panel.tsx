@@ -57,14 +57,19 @@ export function StatsPanel({ stats }: StatsPanelProps) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.label}>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className={`rounded-lg p-3 ${card.bg}`}>
-              <card.icon className={`h-5 w-5 ${card.color}`} />
+        <Card key={card.label} className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg border-slate-200/60 rounded-xl">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
+             <card.icon className="h-24 w-24 text-slate-900" />
+          </div>
+          <CardContent className="p-6 relative z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div className={`rounded-xl p-3 ${card.bg}`}>
+                <card.icon className={`h-5 w-5 ${card.color}`} />
+              </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500">{card.label}</p>
-              <p className="text-2xl font-semibold">{card.value}</p>
+              <p className="text-sm font-medium text-slate-500 tracking-tight">{card.label}</p>
+              <h4 className="text-3xl font-bold tracking-tight text-slate-900 mt-1">{card.value}</h4>
             </div>
           </CardContent>
         </Card>
