@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, invitationEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,26 +73,13 @@ export async function POST(request: NextRequest) {
     const orgName = org?.name || 'your organization';
 
     try {
-      await sendEmail({
-        to: email,
-        subject: `You've been invited to join ${orgName} on DOB Abatement`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #2563eb; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
-              <h2 style="margin: 0; font-size: 18px;">Team Invitation</h2>
-            </div>
-            <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0 0 16px;">${inviterName} has invited you to join <strong>${orgName}</strong> on DOB Abatement SaaS as a <strong>${inviteRole || 'PROJECT_MANAGER'}</strong>.</p>
-              <a href="${signupUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
-                Accept Invitation
-              </a>
-              <p style="margin: 24px 0 0; font-size: 12px; color: #9ca3af;">
-                This invitation expires in 7 days.
-              </p>
-            </div>
-          </div>
-        `,
+      const emailContent = invitationEmail({
+        inviterName,
+        orgName,
+        role: inviteRole || 'PROJECT_MANAGER',
+        signupUrl,
       });
+      await sendEmail({ to: email, ...emailContent });
     } catch (emailErr) {
       console.error('Failed to send invitation email:', emailErr);
       // Don't fail the request — invitation is created even if email fails
