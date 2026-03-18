@@ -79,10 +79,20 @@ export async function GET(
       pdfUrl = urlData?.signedUrl || null;
     }
 
-    // 7. Generate signed URLs for BEFORE/AFTER photos
+    // 7. Generate signed URLs for all photos (INSPECTOR from noi-pdfs, BEFORE/AFTER from contractor-photos)
     const photosWithUrls = await Promise.all(
       (photos || []).map(async (photo) => {
-        if (photo.photo_type === 'BEFORE' || photo.photo_type === 'AFTER') {
+        if (photo.photo_type === 'INSPECTOR' && photo.mime_type === 'image/png') {
+          // Rendered evidence image stored in noi-pdfs bucket
+          const { data: urlData } = await supabase.storage
+            .from('noi-pdfs')
+            .createSignedUrl(photo.storage_path, 3600);
+
+          return {
+            ...photo,
+            signed_url: urlData?.signedUrl || null,
+          };
+        } else if (photo.photo_type === 'BEFORE' || photo.photo_type === 'AFTER') {
           const { data: urlData } = await supabase.storage
             .from('contractor-photos')
             .createSignedUrl(photo.storage_path, 3600);
