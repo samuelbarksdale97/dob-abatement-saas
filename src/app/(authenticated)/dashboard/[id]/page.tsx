@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Circle,
   Building2,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -244,6 +245,23 @@ export default function ViolationDetailPage() {
       toast.success(`Status updated to ${STATUS_LABELS[newStatus as keyof typeof STATUS_LABELS]}`);
     } else {
       toast.error('Failed to update status');
+    }
+  };
+
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const res = await fetch(`/api/violations/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast.success('Violation deleted');
+      router.push('/dashboard');
+    } else {
+      const data = await res.json();
+      toast.error(data.error || 'Failed to delete violation');
+      setDeleting(false);
+      setDeleteConfirm(false);
     }
   };
 
@@ -486,6 +504,42 @@ export default function ViolationDetailPage() {
               pdfUrl={pdfUrl}
             />
           )}
+
+          {/* Delete violation */}
+          <div className="ml-auto">
+            {!deleteConfirm ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setDeleteConfirm(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-600 font-medium">Are you sure?</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Yes, Delete'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => setDeleteConfirm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabbed content */}

@@ -4,7 +4,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Nexark <noreply@nexark.ai>';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'Yoke Management Partners <noreply@Yoke Management.ai>';
 
 interface SendEmailOptions {
   to: string | string[];
@@ -34,7 +34,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
 }
 
 // ============================================================================
-// Shared email wrapper with Nexark branding
+// Shared email wrapper with Yoke Management Partners branding
 // ============================================================================
 
 function emailWrapper(headerBg: string, headerTitle: string, headerSubtitle: string | null, bodyHtml: string) {
@@ -42,7 +42,7 @@ function emailWrapper(headerBg: string, headerTitle: string, headerSubtitle: str
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc;">
       <div style="padding: 24px 24px 0;">
         <div style="margin-bottom: 16px;">
-          <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #0f172a;">nexark</span>
+          <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #0f172a;">Yoke Management</span>
         </div>
         <div style="background: ${headerBg}; color: white; padding: 20px 24px; border-radius: 12px 12px 0 0;">
           <h2 style="margin: 0; font-size: 18px; font-weight: 700;">${headerTitle}</h2>
@@ -53,7 +53,7 @@ function emailWrapper(headerBg: string, headerTitle: string, headerSubtitle: str
         </div>
         <div style="padding: 16px 0; text-align: center;">
           <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-            Sent by <strong>Nexark</strong> &mdash; DOB Abatement Management
+            Sent by <strong>Yoke Management Partners</strong> &mdash; DOB Abatement Management
           </p>
         </div>
       </div>
@@ -72,10 +72,10 @@ export function invitationEmail(params: {
   signupUrl: string;
 }) {
   return {
-    subject: `You've been invited to join ${params.orgName} on Nexark`,
+    subject: `You've been invited to join ${params.orgName} on Yoke Management Partners`,
     html: emailWrapper('#0f172a', 'Team Invitation', null, `
       <p style="margin: 0 0 16px; color: #334155;">${params.inviterName} has invited you to join <strong>${params.orgName}</strong> as a <strong>${params.role.replace('_', ' ')}</strong>.</p>
-      <p style="margin: 0 0 24px; color: #64748b; font-size: 14px;">Nexark helps property managers track and resolve DOB violations efficiently. Click below to set up your account.</p>
+      <p style="margin: 0 0 24px; color: #64748b; font-size: 14px;">Yoke Management Partners helps property managers track and resolve DOB violations efficiently. Click below to set up your account.</p>
       <a href="${params.signupUrl}" style="display: inline-block; background: #0f172a; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">
         Accept Invitation
       </a>

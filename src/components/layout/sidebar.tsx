@@ -43,7 +43,7 @@ export function Sidebar() {
         <div className="flex items-center justify-center p-2 rounded-xl bg-slate-900 text-white shadow-md">
           <ClipboardList className="h-6 w-6" />
         </div>
-        <span className="text-lg font-bold tracking-tight text-slate-900">Nexark</span>
+        <span className="text-lg font-bold tracking-tight text-slate-900">Yoke Mgmt</span>
       </div>
 
       <nav className="flex-1 space-y-1.5 px-4">
