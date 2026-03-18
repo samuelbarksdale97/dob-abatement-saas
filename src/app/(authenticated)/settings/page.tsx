@@ -656,9 +656,33 @@ function TeamTab() {
                     Expires {new Date(inv.expires_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {inv.role.replace('_', ' ')} — pending
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/team/invite/resend`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ invitation_id: inv.id }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        toast.success(`Invitation resent to ${inv.email}`);
+                      } catch (err: any) {
+                        toast.error(err.message || 'Failed to resend invitation');
+                      }
+                    }}
+                  >
+                    <Mail className="h-3 w-3" />
+                    Resend
+                  </Button>
+                  <Badge variant="outline" className="text-xs">
+                    {inv.role.replace('_', ' ')}
+                  </Badge>
+                </div>
               </div>
             ))}
           </CardContent>
