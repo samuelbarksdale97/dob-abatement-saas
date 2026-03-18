@@ -17,7 +17,7 @@ export const sendNotificationEmail = inngest.createFunction(
   async ({ event, step }) => {
     const { type, payload } = event.data;
     const supabase = createAdminClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.yokemgmt.com';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dob-abatement-saas.vercel.app';
 
     if (type === 'submission_created') {
       await step.run('send-submission-email', async () => {

@@ -434,7 +434,7 @@ export default function ViolationDetailPage() {
                         size="sm"
                         className="rounded-xl shrink-0 h-[38px]"
                         onClick={() => {
-                          const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+                          const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://dob-abatement-saas.vercel.app');
                           const link = `${base}/contractor/${contractorToken}`;
                           navigator.clipboard.writeText(link);
                           toast.success('Link copied to clipboard');
