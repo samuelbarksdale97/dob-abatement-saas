@@ -58,35 +58,60 @@ export async function POST(
       );
     }
 
-    // 4. Download the AFTER image from storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('contractor-photos')
-      .download(photo.storage_path);
+    // 4. Check if photo verification is disabled via org settings
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', validation.data!.org_id)
+      .single();
 
-    if (downloadError || !fileData) {
-      console.error('Failed to download AFTER photo:', downloadError);
-      return NextResponse.json(
-        { error: 'Failed to download uploaded photo for verification' },
-        { status: 500 }
+    const orgSettings = (org?.settings as Record<string, unknown>) || {};
+    const skipVerification = orgSettings.skip_photo_verification === true;
+
+    let result: { isMatch: boolean; confidence: number; reasoning: string; details: string };
+    let meta: { model: string; usage: { cost_usd: number } } | null = null;
+
+    if (skipVerification) {
+      // QA mode: auto-approve without calling Gemini
+      result = {
+        isMatch: true,
+        confidence: 100,
+        reasoning: 'QA mode: verification skipped',
+        details: 'Photo auto-approved via admin toggle. AI angle verification was disabled in organization settings.',
+      };
+    } else {
+      // 4b. Download the AFTER image from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('contractor-photos')
+        .download(photo.storage_path);
+
+      if (downloadError || !fileData) {
+        console.error('Failed to download AFTER photo:', downloadError);
+        return NextResponse.json(
+          { error: 'Failed to download uploaded photo for verification' },
+          { status: 500 }
+        );
+      }
+
+      const afterBuffer = Buffer.from(await fileData.arrayBuffer());
+      const afterBase64 = afterBuffer.toString('base64');
+
+      // 5. Strip data URL prefix from inspector image if present
+      let inspectorBase64 = inspector_image_data;
+      const dataUrlMatch = inspectorBase64.match(/^data:image\/[^;]+;base64,(.+)$/);
+      if (dataUrlMatch) {
+        inspectorBase64 = dataUrlMatch[1];
+      }
+
+      // 6. Call Gemini Vision for angle verification
+      const geminiResult = await verifyPhotoAngle(
+        afterBase64,
+        inspectorBase64,
+        photo.mime_type || 'image/jpeg',
       );
+      result = geminiResult.result;
+      meta = geminiResult.meta;
     }
-
-    const afterBuffer = Buffer.from(await fileData.arrayBuffer());
-    const afterBase64 = afterBuffer.toString('base64');
-
-    // 5. Strip data URL prefix from inspector image if present
-    let inspectorBase64 = inspector_image_data;
-    const dataUrlMatch = inspectorBase64.match(/^data:image\/[^;]+;base64,(.+)$/);
-    if (dataUrlMatch) {
-      inspectorBase64 = dataUrlMatch[1];
-    }
-
-    // 6. Call Gemini Vision for angle verification
-    const { result, meta } = await verifyPhotoAngle(
-      afterBase64,
-      inspectorBase64,
-      photo.mime_type || 'image/jpeg',
-    );
 
     // 7. Update photo metadata and status
     const existingMetadata = (photo.metadata as Record<string, unknown>) || {};
@@ -103,8 +128,9 @@ export async function POST(
             reasoning: result.reasoning,
             details: result.details,
             verified_at: new Date().toISOString(),
-            model: meta.model,
-            cost_usd: meta.usage.cost_usd,
+            model: meta?.model || 'skipped',
+            cost_usd: meta?.usage.cost_usd || 0,
+            skipped: skipVerification,
           },
         },
         status: isApproved ? 'APPROVED' : 'PENDING_REVIEW',
@@ -142,8 +168,9 @@ export async function POST(
         reasoning: result.reasoning,
         details: result.details,
         photo_id,
+        skipped: skipVerification,
       },
-      usage: meta.usage,
+      usage: meta?.usage || { cost_usd: 0 },
     });
   } catch (error) {
     console.error('Photo verification error:', error);

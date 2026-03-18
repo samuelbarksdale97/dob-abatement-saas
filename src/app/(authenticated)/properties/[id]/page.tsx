@@ -64,9 +64,9 @@ export default function PropertyDetailPage() {
           violation_count: u.violation_count ?? 0,
           worst_status: u.worst_status ?? null,
         })),
-        total_violations: 0,
-        total_fines: 0,
-        unlinked_violations: 0,
+        total_violations: propData.total_violations ?? 0,
+        total_fines: propData.total_fines ?? 0,
+        unlinked_violations: propData.unlinked_violations ?? 0,
       });
     } catch (error) {
       console.error('Failed to fetch property detail:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Nav } from '@/components/layout/nav';
@@ -133,29 +133,35 @@ export default function ViolationDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscription for live updates on this violation
+  // Realtime subscription for live updates on this violation (debounced)
+  const detailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const supabase = createClient();
+    const debouncedFetch = () => {
+      if (detailDebounceRef.current) clearTimeout(detailDebounceRef.current);
+      detailDebounceRef.current = setTimeout(() => fetchData(), 1000);
+    };
     const channel = supabase
       .channel(`violation-detail-${id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'violations', filter: `id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'photos', filter: `violation_id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'work_orders', filter: `violation_id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .subscribe();
 
     return () => {
+      if (detailDebounceRef.current) clearTimeout(detailDebounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [id, fetchData]);

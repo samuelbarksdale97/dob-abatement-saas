@@ -27,12 +27,17 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users to login (except for login page, API routes, and contractor routes)
-  const isLoginPage = request.nextUrl.pathname === '/login';
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api');
-  const isContractorRoute = request.nextUrl.pathname.startsWith('/contractor');
+  const path = request.nextUrl.pathname;
+  console.log(`[PROXY] ${request.method} ${path} | user=${user?.email ?? 'NONE'}`);
 
-  if (!user && !isLoginPage && !isApiRoute && !isContractorRoute) {
+  // Redirect unauthenticated users to login (except for login page, API routes, and contractor routes)
+  const isLoginPage = path === '/login';
+  const isSignupPage = path === '/signup';
+  const isApiRoute = path.startsWith('/api');
+  const isContractorRoute = path.startsWith('/contractor');
+
+  if (!user && !isLoginPage && !isSignupPage && !isApiRoute && !isContractorRoute) {
+    console.log(`[PROXY] → REDIRECT to /login (no user)`);
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
@@ -40,6 +45,7 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect authenticated users away from login
   if (user && isLoginPage) {
+    console.log(`[PROXY] → REDIRECT to /dashboard (already logged in)`);
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

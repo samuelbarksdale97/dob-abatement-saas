@@ -24,7 +24,17 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
 
-    return NextResponse.json({ property });
+    // Fetch violation stats for this property
+    const { data: violations } = await supabase
+      .from('violations')
+      .select('id, total_fines, unit_id')
+      .eq('property_id', id);
+
+    const total_violations = violations?.length ?? 0;
+    const total_fines = violations?.reduce((sum, v) => sum + (v.total_fines || 0), 0) ?? 0;
+    const unlinked_violations = violations?.filter(v => !v.unit_id).length ?? 0;
+
+    return NextResponse.json({ property, total_violations, total_fines, unlinked_violations });
   } catch (error) {
     console.error('Property fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
