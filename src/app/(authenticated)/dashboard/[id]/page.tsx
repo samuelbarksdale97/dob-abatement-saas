@@ -428,13 +428,14 @@ export default function ViolationDetailPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contractor Access Portal Link</p>
                     <div className="flex items-center gap-2 max-w-full">
                       <code className="flex-1 rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs text-slate-600 break-all truncate">
-                        {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/{contractorToken}
+                        {typeof window !== 'undefined' ? window.location.origin : ''}/contractor/{contractorToken.slice(0, 8)}...
                       </code>
                       <Button
                         size="sm"
                         className="rounded-xl shrink-0 h-[38px]"
                         onClick={() => {
-                          const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/${contractorToken}`;
+                          const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+                          const link = `${base}/contractor/${contractorToken}`;
                           navigator.clipboard.writeText(link);
                           toast.success('Link copied to clipboard');
                         }}

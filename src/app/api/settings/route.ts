@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
@@ -80,7 +80,9 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const { data: updated, error } = await supabase
+    // Use admin client to bypass RLS for org settings update
+    const adminClient = createAdminClient();
+    const { data: updated, error } = await adminClient
       .from('organizations')
       .update({ settings: updates })
       .eq('id', profile.org_id)

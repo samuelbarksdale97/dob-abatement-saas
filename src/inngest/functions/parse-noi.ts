@@ -142,6 +142,26 @@ export const parseNOI = inngest.createFunction(
       return { isDuplicate: false, existingViolationId: null };
     });
 
+    // If duplicate detected, mark as duplicate and halt pipeline
+    if (duplicateInfo.isDuplicate) {
+      await step.run('halt-duplicate', async () => {
+        await supabase
+          .from('violations')
+          .update({
+            status: 'CLOSED',
+            parse_status: 'duplicate',
+            notes: `Duplicate of existing violation ${duplicateInfo.existingViolationId}. Pipeline halted.`,
+          })
+          .eq('id', violationId);
+
+        log.info('halt_duplicate', 'Pipeline halted — duplicate NOI', {
+          existing_violation_id: duplicateInfo.existingViolationId,
+        });
+      });
+
+      return { success: false, violationId, isDuplicate: true };
+    }
+
     // ================================================================
     // STEP 2: Insert Records — Write parsed data to Supabase
     // ================================================================

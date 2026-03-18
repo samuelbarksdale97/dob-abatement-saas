@@ -296,7 +296,7 @@ export default function ContractorViewPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between pb-2 border-b border-slate-200">
            <h2 className="text-xl font-black tracking-tight text-slate-900">Required Repairs</h2>
-           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-200 px-2.5 py-1 rounded-md">{items.length} Items</span>
+           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-200 px-2.5 py-1 rounded-md">{items.length} Item{items.length !== 1 ? 's' : ''}</span>
         </div>
 
         {items.map((item) => {
