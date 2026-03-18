@@ -296,7 +296,7 @@ export default function ContractorViewPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between pb-2 border-b border-slate-200">
            <h2 className="text-xl font-black tracking-tight text-slate-900">Required Repairs</h2>
-           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-200 px-2.5 py-1 rounded-md">{items.length} Items</span>
+           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-200 px-2.5 py-1 rounded-md">{items.length} Item{items.length !== 1 ? 's' : ''}</span>
         </div>
 
         {items.map((item) => {
@@ -322,11 +322,12 @@ export default function ContractorViewPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-5 sm:p-6 space-y-6 bg-white">
-                {inspectors.length > 0 && pdf_url ? (
+                {inspectors.length > 0 && (inspectors.some((p: any) => p.signed_url) || pdf_url) ? (
                   // 1:1 before/after pairs for each inspector photo
                   inspectors.map((inspectorPhoto, idx) => {
                     const existingAfter = afterByInspector.get(inspectorPhoto.id);
                     const description = (inspectorPhoto.metadata as Record<string, string>)?.description;
+                    const inspectorSignedUrl = (inspectorPhoto as any).signed_url as string | undefined;
 
                     return (
                       <div key={inspectorPhoto.id} className="last:mb-0 mb-6 pb-6 last:pb-0 last:border-0 border-b border-slate-100">
@@ -344,11 +345,26 @@ export default function ContractorViewPage() {
                               Original Infraction (Before)
                             </p>
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                               <EvidencePhoto
-                                 pdfUrl={pdf_url}
-                                 pageNumber={inspectorPhoto.page_number!}
-                                 width={200}
-                               />
+                              {inspectorSignedUrl ? (
+                                // Pre-rendered PNG image (new flow)
+                                <img
+                                  src={inspectorSignedUrl}
+                                  alt={description || `Inspector photo page ${inspectorPhoto.page_number}`}
+                                  className="w-full h-auto"
+                                  loading="lazy"
+                                />
+                              ) : pdf_url && inspectorPhoto.page_number ? (
+                                // Legacy: render PDF page client-side
+                                <EvidencePhoto
+                                  pdfUrl={pdf_url}
+                                  pageNumber={inspectorPhoto.page_number}
+                                  width={200}
+                                />
+                              ) : (
+                                <div className="flex h-[260px] items-center justify-center text-slate-400 text-xs">
+                                  No photo available
+                                </div>
+                              )}
                             </div>
                           </div>
                           {/* Right: After (Upload) */}
@@ -362,6 +378,7 @@ export default function ContractorViewPage() {
                                  violationItemId={item.id}
                                  photoType="AFTER"
                                  inspectorPhotoId={inspectorPhoto.id}
+                                 inspectorImageUrl={inspectorSignedUrl}
                                  pdfUrl={pdf_url ?? undefined}
                                  inspectorPageNumber={inspectorPhoto.page_number ?? undefined}
                                  existingPhoto={

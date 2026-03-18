@@ -24,6 +24,7 @@ interface PhotoUploadSlotProps {
   inspectorPhotoId?: string;
   pdfUrl?: string;
   inspectorPageNumber?: number;
+  inspectorImageUrl?: string;
   existingPhoto?: {
     id: string;
     signed_url: string;
@@ -38,6 +39,7 @@ export function PhotoUploadSlot({
   inspectorPhotoId,
   pdfUrl,
   inspectorPageNumber,
+  inspectorImageUrl,
   existingPhoto,
   onUploadComplete,
 }: PhotoUploadSlotProps) {
@@ -60,13 +62,21 @@ export function PhotoUploadSlot({
   };
 
   const runVerification = async (photoId: string) => {
-    if (!pdfUrl || !inspectorPageNumber) return;
+    if (!inspectorImageUrl && (!pdfUrl || !inspectorPageNumber)) return;
 
     setVerifying(true);
     try {
-      // Render the inspector PDF page to a data URL client-side
-      const { renderPdfPageToImage } = await import('@/lib/pdf/prepare-images');
-      const inspectorDataUrl = await renderPdfPageToImage(pdfUrl, inspectorPageNumber, 1.5);
+      let inspectorDataUrl: string;
+
+      if (inspectorImageUrl) {
+        // Use pre-rendered image: fetch and convert to data URL
+        const { fetchImageAsDataUrl } = await import('@/lib/pdf/prepare-images');
+        inspectorDataUrl = await fetchImageAsDataUrl(inspectorImageUrl);
+      } else {
+        // Legacy fallback: render PDF page client-side
+        const { renderPdfPageToImage } = await import('@/lib/pdf/prepare-images');
+        inspectorDataUrl = await renderPdfPageToImage(pdfUrl!, inspectorPageNumber!, 1.5);
+      }
 
       // Call verification API
       const verifyResponse = await fetch(`/api/contractor/${token}/photos/verify`, {

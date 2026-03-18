@@ -20,6 +20,7 @@ import {
   Users,
   Plus,
   Shield,
+  FlaskConical,
 } from 'lucide-react';
 
 interface EmailConnection {
@@ -200,6 +201,7 @@ function SettingsContent() {
           <TabsTrigger value="gmail">Gmail</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="testing">Testing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="gmail" className="mt-4">
@@ -377,8 +379,88 @@ function SettingsContent() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="testing" className="mt-4">
+          <TestingTab />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function TestingTab() {
+  const [skipVerification, setSkipVerification] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const data = await res.json();
+          setSkipVerification(data.settings?.skip_photo_verification === true);
+        }
+      } catch {
+        console.error('Failed to load settings');
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const handleToggle = async (enabled: boolean) => {
+    setToggling(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skip_photo_verification: enabled }),
+      });
+      if (res.ok) {
+        setSkipVerification(enabled);
+        toast.success(enabled ? 'Photo verification disabled (QA mode)' : 'Photo verification re-enabled');
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to update setting');
+      }
+    } catch {
+      toast.error('Failed to update setting');
+    }
+    setToggling(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <FlaskConical className="h-5 w-5 text-amber-600" />
+          <CardTitle>QA & Testing</CardTitle>
+        </div>
+        <CardDescription>
+          Settings that make it easier to test the full workflow without real data.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between rounded-lg border p-4">
+          <div>
+            <p className="font-medium text-gray-900">Skip Photo Angle Verification</p>
+            <p className="text-sm text-gray-500">
+              When enabled, contractor photo uploads are auto-approved without AI verification.
+            </p>
+            {skipVerification && (
+              <p className="mt-1 text-xs font-medium text-amber-600">
+                Active — all contractor photos will be auto-approved
+              </p>
+            )}
+          </div>
+          <Switch
+            checked={skipVerification}
+            onCheckedChange={handleToggle}
+            disabled={loading || toggling}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -574,9 +656,33 @@ function TeamTab() {
                     Expires {new Date(inv.expires_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {inv.role.replace('_', ' ')} — pending
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/team/invite/resend`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ invitation_id: inv.id }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        toast.success(`Invitation resent to ${inv.email}`);
+                      } catch (err: any) {
+                        toast.error(err.message || 'Failed to resend invitation');
+                      }
+                    }}
+                  >
+                    <Mail className="h-3 w-3" />
+                    Resend
+                  </Button>
+                  <Badge variant="outline" className="text-xs">
+                    {inv.role.replace('_', ' ')}
+                  </Badge>
+                </div>
               </div>
             ))}
           </CardContent>

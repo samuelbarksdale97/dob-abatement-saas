@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { parseNOIPdf, analyzePdfPages } from '@/lib/ai/gemini';
 import { ParseLogger } from '@/lib/parse-logger';
 import { normalizeAddress, findMatchingProperty } from '@/lib/address-normalization';
+import { renderPdfPages } from '@/lib/pdf/render-page-server';
 import type { ParseCosts } from '@/lib/ai/schemas';
 
 export const parseNOI = inngest.createFunction(
@@ -141,6 +142,26 @@ export const parseNOI = inngest.createFunction(
 
       return { isDuplicate: false, existingViolationId: null };
     });
+
+    // If duplicate detected, mark as duplicate and halt pipeline
+    if (duplicateInfo.isDuplicate) {
+      await step.run('halt-duplicate', async () => {
+        await supabase
+          .from('violations')
+          .update({
+            status: 'CLOSED',
+            parse_status: 'duplicate',
+            notes: `Duplicate of existing violation ${duplicateInfo.existingViolationId}. Pipeline halted.`,
+          })
+          .eq('id', violationId);
+
+        log.info('halt_duplicate', 'Pipeline halted — duplicate NOI', {
+          existing_violation_id: duplicateInfo.existingViolationId,
+        });
+      });
+
+      return { success: false, violationId, isDuplicate: true };
+    }
 
     // ================================================================
     // STEP 2: Insert Records — Write parsed data to Supabase
@@ -581,6 +602,107 @@ export const parseNOI = inngest.createFunction(
           photos_matched: matchedCount,
           photos_unmatched: unmatchedCount,
           match_details: matchLog,
+        },
+      );
+    });
+
+    // ================================================================
+    // STEP 5b: Render Evidence Images — Convert PDF pages to PNGs
+    // so the contractor portal can display them as plain <img> tags
+    // instead of relying on client-side PDF rendering (fixes BUG-006)
+    // ================================================================
+    await step.run('render-evidence-images', async () => {
+      await log.stepStart('render_images', 'Rendering evidence photo pages to PNG images');
+
+      // Get INSPECTOR photos we just inserted
+      const { data: inspectorPhotos } = await supabase
+        .from('photos')
+        .select('id, page_number')
+        .eq('violation_id', violationId)
+        .eq('photo_type', 'INSPECTOR');
+
+      if (!inspectorPhotos || inspectorPhotos.length === 0) {
+        await log.stepComplete('render_images', 'No inspector photos to render', {
+          passed: true,
+          checks: [{ name: 'photos to render', passed: false, detail: 'Skipped — none' }],
+        });
+        return;
+      }
+
+      const pageNumbers = inspectorPhotos
+        .map(p => p.page_number)
+        .filter((n): n is number => n !== null);
+
+      if (pageNumbers.length === 0) {
+        await log.stepComplete('render_images', 'No page numbers set on inspector photos', {
+          passed: true,
+          checks: [{ name: 'page numbers', passed: false, detail: 'Skipped — no page numbers' }],
+        });
+        return;
+      }
+
+      // Download PDF
+      const { data: pdfData } = await supabase.storage
+        .from('noi-pdfs')
+        .download(pdfStoragePath);
+
+      if (!pdfData) {
+        log.error('render_images', 'Failed to download PDF for image rendering');
+        return;
+      }
+
+      const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
+
+      // Render pages to PNG
+      const renderedPages = await renderPdfPages(pdfBuffer, pageNumbers, 2.0);
+
+      log.info('render_images', `Rendered ${renderedPages.length} pages to PNG`, {
+        page_numbers: renderedPages.map(p => p.pageNumber),
+      });
+
+      // Upload each rendered image to storage and update the photo record
+      let uploadedCount = 0;
+      for (const rendered of renderedPages) {
+        const imagePath = `${orgId}/evidence/${violationId}/page_${rendered.pageNumber}.png`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('noi-pdfs')
+          .upload(imagePath, rendered.buffer, {
+            contentType: 'image/png',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          log.error('render_images', `Failed to upload page ${rendered.pageNumber}: ${uploadError.message}`);
+          continue;
+        }
+
+        // Find the photo record(s) for this page and update storage_path
+        const matchingPhotos = inspectorPhotos.filter(p => p.page_number === rendered.pageNumber);
+        for (const photo of matchingPhotos) {
+          await supabase
+            .from('photos')
+            .update({
+              storage_path: imagePath,
+              mime_type: 'image/png',
+              file_name: `page_${rendered.pageNumber}.png`,
+              file_size: rendered.buffer.length,
+            })
+            .eq('id', photo.id);
+        }
+
+        uploadedCount++;
+      }
+
+      await log.stepComplete(
+        'render_images',
+        `Rendered and uploaded ${uploadedCount}/${pageNumbers.length} evidence images`,
+        {
+          passed: uploadedCount > 0,
+          checks: [
+            { name: 'images rendered', passed: renderedPages.length > 0, detail: `${renderedPages.length} pages` },
+            { name: 'images uploaded', passed: uploadedCount > 0, detail: `${uploadedCount} uploaded` },
+          ],
         },
       );
     });

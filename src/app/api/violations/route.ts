@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
     .from('violations')
     .select('*, violation_items(count), photos(count)', { count: 'exact' });
 
+  // Exclude ghost violations: stuck in NEW with pending parse and no parsed data
+  // These are created when a PDF is uploaded but Inngest never picks up the event
+  query = query.not('parse_status', 'eq', 'pending');
+
   // Single status filter
   if (status) {
     query = query.eq('status', status);

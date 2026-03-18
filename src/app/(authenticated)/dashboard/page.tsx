@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Nav } from '@/components/layout/nav';
 import { StatsPanel } from '@/components/dashboard/stats-panel';
 import { PropertyCard } from '@/components/dashboard/property-card';
@@ -14,25 +14,30 @@ function PortfolioContent() {
   const [properties, setProperties] = useState<PropertyPortfolioStats[]>([]);
   const [stats, setStats] = useState<ViolationStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchPortfolio = useCallback(async () => {
-    setLoading(true);
+  const fetchPortfolio = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    console.log('[DASHBOARD] fetchPortfolio called, showLoading=', showLoading);
     try {
       const res = await fetch('/api/portfolio');
+      console.log('[DASHBOARD] /api/portfolio response status:', res.status);
       const data = await res.json();
+      console.log('[DASHBOARD] properties:', data.properties?.length, 'stats:', JSON.stringify(data.stats)?.slice(0, 150));
+      if (data.error) console.error('[DASHBOARD] API returned error:', data.error);
       setProperties(data.properties || []);
       setStats(data.stats || null);
     } catch (error) {
-      console.error('Failed to fetch portfolio:', error);
+      console.error('[DASHBOARD] Failed to fetch portfolio:', error);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchPortfolio();
+    fetchPortfolio(true);
   }, [fetchPortfolio]);
 
-  // Realtime subscription for live updates
+  // Realtime subscription for live updates (debounced, no loading flash)
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -40,11 +45,15 @@ function PortfolioContent() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'violations' },
-        () => fetchPortfolio(),
+        () => {
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          debounceRef.current = setTimeout(() => fetchPortfolio(false), 2000);
+        },
       )
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [fetchPortfolio]);

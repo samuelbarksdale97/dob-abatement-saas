@@ -47,7 +47,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
               <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                 <span className="flex items-center gap-1">
                   <Building2 className="h-3.5 w-3.5" />
-                  {property.unit_count > 0 ? `${property.unit_count} Units` : 'Building'}
+                  {property.unit_count > 0 ? `${property.unit_count} Unit${property.unit_count !== 1 ? 's' : ''}` : 'Building'}
                 </span>
                 <span className="h-1 w-1 rounded-full bg-slate-300"></span>
                 <span>{property.violation_count} Violations</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Nav } from '@/components/layout/nav';
@@ -133,29 +133,35 @@ export default function ViolationDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscription for live updates on this violation
+  // Realtime subscription for live updates on this violation (debounced)
+  const detailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const supabase = createClient();
+    const debouncedFetch = () => {
+      if (detailDebounceRef.current) clearTimeout(detailDebounceRef.current);
+      detailDebounceRef.current = setTimeout(() => fetchData(), 1000);
+    };
     const channel = supabase
       .channel(`violation-detail-${id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'violations', filter: `id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'photos', filter: `violation_id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'work_orders', filter: `violation_id=eq.${id}` },
-        () => fetchData(),
+        debouncedFetch,
       )
       .subscribe();
 
     return () => {
+      if (detailDebounceRef.current) clearTimeout(detailDebounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [id, fetchData]);
@@ -422,13 +428,14 @@ export default function ViolationDetailPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contractor Access Portal Link</p>
                     <div className="flex items-center gap-2 max-w-full">
                       <code className="flex-1 rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs text-slate-600 break-all truncate">
-                        {process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/{contractorToken}
+                        {typeof window !== 'undefined' ? window.location.origin : ''}/contractor/{contractorToken.slice(0, 8)}...
                       </code>
                       <Button
                         size="sm"
                         className="rounded-xl shrink-0 h-[38px]"
                         onClick={() => {
-                          const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contractor/${contractorToken}`;
+                          const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://dob-abatement-saas.vercel.app');
+                          const link = `${base}/contractor/${contractorToken}`;
                           navigator.clipboard.writeText(link);
                           toast.success('Link copied to clipboard');
                         }}

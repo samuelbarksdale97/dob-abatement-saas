@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/layout/nav';
 import { StatsPanel } from '@/components/dashboard/stats-panel';
@@ -66,7 +66,8 @@ function DashboardContent() {
     fetchStats();
   }, [fetchViolations, fetchStats]);
 
-  // Set up realtime subscription for live updates
+  // Set up realtime subscription for live updates (debounced to prevent server overload)
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -75,13 +76,17 @@ function DashboardContent() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'violations' },
         () => {
-          fetchViolations();
-          fetchStats();
+          if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+          realtimeDebounceRef.current = setTimeout(() => {
+            fetchViolations();
+            fetchStats();
+          }, 2000);
         },
       )
       .subscribe();
 
     return () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [fetchViolations, fetchStats]);

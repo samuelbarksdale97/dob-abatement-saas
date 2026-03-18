@@ -24,7 +24,34 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ units });
+    // Enrich each unit with violation_count and worst_status
+    const { data: violations } = await supabase
+      .from('violations')
+      .select('id, unit_id, status')
+      .eq('property_id', propertyId);
+
+    const enrichedUnits = (units || []).map(unit => {
+      const unitViolations = (violations || []).filter(v => v.unit_id === unit.id);
+      const statusPriority: Record<string, number> = {
+        'NEW': 1, 'PARSING': 2, 'PARSED': 3, 'ASSIGNED': 4, 'IN_PROGRESS': 5,
+        'AWAITING_PHOTOS': 6, 'PHOTOS_UPLOADED': 7, 'READY_FOR_SUBMISSION': 8,
+        'SUBMITTED': 9, 'REJECTED': 10, 'ADDITIONAL_INFO_REQUESTED': 11,
+        'APPROVED': 12, 'CLOSED': 13,
+      };
+      const worstStatus = unitViolations.length > 0
+        ? unitViolations.reduce((worst, v) =>
+            (statusPriority[v.status] || 99) < (statusPriority[worst.status] || 99) ? v : worst
+          ).status
+        : null;
+
+      return {
+        ...unit,
+        violation_count: unitViolations.length,
+        worst_status: worstStatus,
+      };
+    });
+
+    return NextResponse.json({ units: enrichedUnits });
   } catch (error) {
     console.error('Units fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
