@@ -19,7 +19,14 @@ import {
   PartyPopper,
   AlertTriangle,
   DollarSign,
+  Copy,
+  ExternalLink,
+  RotateCcw,
+  SkipForward,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import type { ParseMetadata, ParseStepStatus, ParseStepName } from '@/lib/ai/schemas';
 
 interface ParseProgressProps {
@@ -65,6 +72,9 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
   const [startTime] = useState<number>(Date.now());
   const [elapsed, setElapsed] = useState<number>(0);
   const completionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [overriding, setOverriding] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const router = useRouter();
 
   // Stable completion handler with delay so user sees the final state
   const handleComplete = useCallback(() => {
@@ -79,9 +89,49 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
     };
   }, []);
 
+  const duplicateViolationId = (metadata as unknown as Record<string, unknown>)?.duplicate_violation_id as string | undefined;
+  const isDuplicate = parseStatus === 'duplicate';
+
+  const handleOverride = async () => {
+    if (!duplicateViolationId) return;
+    setOverriding(true);
+    try {
+      const res = await fetch(`/api/violations/${violationId}/override-duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existing_violation_id: duplicateViolationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Override failed');
+      toast.success('Existing NOI replaced — re-parsing document');
+      // The violation is now re-processing, the progress UI will resume
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Override failed');
+      setOverriding(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      const res = await fetch(`/api/violations/${violationId}/skip-duplicate`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Skip failed');
+      }
+      toast.info('Duplicate skipped');
+      router.push(`/dashboard/${duplicateViolationId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to skip');
+      setSkipping(false);
+    }
+  };
+
   // Elapsed time ticker — runs while pending or processing
   useEffect(() => {
-    if (parseStatus === 'completed' || parseStatus === 'failed') return;
+    if (parseStatus === 'completed' || parseStatus === 'failed' || parseStatus === 'duplicate') return;
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
@@ -137,7 +187,7 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
   // Polling fallback — ensures progress updates even if Realtime isn't enabled
   useEffect(() => {
-    if (parseStatus === 'completed' || parseStatus === 'failed') return;
+    if (parseStatus === 'completed' || parseStatus === 'failed' || parseStatus === 'duplicate') return;
 
     const supabase = createClient();
     const poll = async () => {
@@ -187,13 +237,15 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
   return (
     <div className={`rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-sm transition-colors ${
-      isFailed ? 'border-red-300 bg-red-50/50' : ''
+      isFailed ? 'border-red-300 bg-red-50/50' :
+      isDuplicate ? 'border-amber-300 bg-amber-50/30' : ''
     }`}>
       {/* Header */}
       <div className="mb-8 flex items-center justify-between border-b border-slate-100 pb-5">
         <div>
           <h3 className="text-2xl font-black tracking-tight text-slate-900">
             {isFailed ? 'Parse Failed' :
+             isDuplicate ? 'Duplicate Found' :
              isComplete ? 'Parse Complete!' :
              'AI Processing Your NOI...'}
           </h3>
@@ -333,6 +385,57 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
             )}
           </div>
         </>
+      )}
+
+      {/* Duplicate detected */}
+      {isDuplicate && duplicateViolationId && (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50/80 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 border border-amber-200">
+                <Copy className="h-5 w-5 text-amber-700" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-lg font-bold tracking-tight text-amber-900">Duplicate NOI Detected</h4>
+                <p className="mt-1.5 text-sm font-medium text-amber-800 leading-relaxed">
+                  This Notice of Infraction has already been processed and exists in your system.
+                  You can view the existing record to verify, then decide whether to replace it with this new upload or skip.
+                </p>
+                <a
+                  href={`/dashboard/${duplicateViolationId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-blue-700 hover:text-blue-800 underline underline-offset-2 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View existing violation
+                </a>
+                <div className="mt-5 flex gap-3">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleOverride}
+                    disabled={overriding || skipping}
+                    className="gap-1.5"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    {overriding ? 'Replacing...' : 'Override Existing'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSkip}
+                    disabled={overriding || skipping}
+                    className="gap-1.5"
+                  >
+                    <SkipForward className="h-3.5 w-3.5" />
+                    {skipping ? 'Skipping...' : 'Skip — Use Existing'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Completion celebration */}

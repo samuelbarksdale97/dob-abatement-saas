@@ -139,8 +139,8 @@ describe('getPriorityColor', () => {
   });
 
   it('returns gray for P3 and higher', () => {
-    expect(getPriorityColor(3)).toContain('gray');
-    expect(getPriorityColor(99)).toContain('gray');
+    expect(getPriorityColor(3)).toContain('slate');
+    expect(getPriorityColor(99)).toContain('slate');
   });
 });
 
@@ -153,18 +153,18 @@ describe('getPriorityLabel', () => {
 });
 
 describe('getUrgencyColor', () => {
-  it('returns gray for null deadline', () => {
-    expect(getUrgencyColor(null, 'NEW')).toBe('text-gray-400');
+  it('returns slate for null deadline', () => {
+    expect(getUrgencyColor(null, 'NEW')).toBe('text-slate-400');
   });
 
-  it('returns gray for APPROVED status regardless of deadline', () => {
+  it('returns slate for APPROVED status regardless of deadline', () => {
     const deadline = new Date(Date.now() - 86400000).toISOString(); // yesterday
-    expect(getUrgencyColor(deadline, 'APPROVED')).toBe('text-gray-400');
+    expect(getUrgencyColor(deadline, 'APPROVED')).toBe('text-slate-400');
   });
 
-  it('returns gray for CLOSED status regardless of deadline', () => {
+  it('returns slate for CLOSED status regardless of deadline', () => {
     const deadline = new Date(Date.now() - 86400000).toISOString();
-    expect(getUrgencyColor(deadline, 'CLOSED')).toBe('text-gray-400');
+    expect(getUrgencyColor(deadline, 'CLOSED')).toBe('text-slate-400');
   });
 
   it('returns red bold for overdue deadlines', () => {
@@ -177,14 +177,14 @@ describe('getUrgencyColor', () => {
     expect(getUrgencyColor(soon, 'IN_PROGRESS')).toContain('orange');
   });
 
-  it('returns yellow for deadlines within 30 days', () => {
+  it('returns amber for deadlines within 30 days', () => {
     const upcoming = new Date(Date.now() + 20 * 86400000).toISOString();
-    expect(getUrgencyColor(upcoming, 'IN_PROGRESS')).toContain('yellow');
+    expect(getUrgencyColor(upcoming, 'IN_PROGRESS')).toContain('amber');
   });
 
-  it('returns green for deadlines beyond 30 days', () => {
+  it('returns emerald for deadlines beyond 30 days', () => {
     const farOut = new Date(Date.now() + 60 * 86400000).toISOString();
-    expect(getUrgencyColor(farOut, 'IN_PROGRESS')).toContain('green');
+    expect(getUrgencyColor(farOut, 'IN_PROGRESS')).toContain('emerald');
   });
 });
 
