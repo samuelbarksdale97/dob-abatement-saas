@@ -1,7 +1,3 @@
-'use client';
-
-import { NotificationBell } from '@/components/layout/notification-bell';
-
 interface NavProps {
   title?: string;
 }
@@ -12,9 +8,6 @@ export function Nav({ title }: NavProps) {
       <h1 className="text-[1.35rem] font-bold tracking-tight text-slate-800">
         {title || 'Dashboard'}
       </h1>
-      <div className="flex items-center gap-4">
-        <NotificationBell />
-      </div>
     </header>
   );
 }

@@ -200,184 +200,36 @@ function SettingsContent() {
         <TabsList>
           <TabsTrigger value="gmail">Gmail</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="gmail" className="mt-4">
-      {/* Email Connection Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-blue-600" />
-            <CardTitle>Email Monitoring</CardTitle>
-          </div>
-          <CardDescription>
-            Connect your Gmail to automatically detect incoming NOI emails and import them into the system.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loading ? (
-            <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Loading...
-            </div>
-          ) : connection ? (
-            <>
-              {/* Connected state */}
-              <div className="flex items-center justify-between rounded-lg border bg-green-50 p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-green-900">{connection.connected_email}</p>
-                    <p className="text-sm text-green-700">
-                      Connected {formatDate(connection.created_at)}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant={connection.status === 'active' ? 'default' : 'destructive'}>
-                  {connection.status}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-blue-600" />
+                <CardTitle>Email Monitoring</CardTitle>
+              </div>
+              <CardDescription>
+                Automatically detect incoming NOI emails and import them into the system.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="py-10 text-center">
+                <Mail className="mx-auto mb-3 h-12 w-12 text-slate-200" />
+                <Badge variant="outline" className="text-sm font-semibold text-slate-500 border-slate-300 px-4 py-1">
+                  Coming Soon
                 </Badge>
+                <p className="mt-3 text-sm text-slate-400">
+                  Gmail integration for automatic NOI detection is under development.
+                </p>
               </div>
-
-              {/* Controls */}
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium text-gray-900">Auto-sync</p>
-                  <p className="text-sm text-gray-500">
-                    Automatically check for new NOI emails every 5 minutes
-                  </p>
-                </div>
-                <Switch
-                  checked={connection.auto_poll_enabled}
-                  onCheckedChange={handleToggleAutoPoll}
-                  disabled={togglingPoll}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium text-gray-900">Last synced</p>
-                  <p className="text-sm text-gray-500">
-                    {connection.last_synced_at
-                      ? formatDate(connection.last_synced_at)
-                      : 'Never synced'}
-                    {connection.last_sync_message_count > 0 &&
-                      ` (${connection.last_sync_message_count} found)`}
-                  </p>
-                </div>
-                <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm">
-                  <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                  {syncing ? 'Syncing...' : 'Sync Now'}
-                </Button>
-              </div>
-
-              <Button
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-                variant="destructive"
-                size="sm"
-                className="w-full"
-              >
-                <Unplug className="mr-2 h-4 w-4" />
-                {disconnecting ? 'Disconnecting...' : 'Disconnect Gmail'}
-              </Button>
-
-              {/* Sync History */}
-              {recentSyncs.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="mb-3 text-sm font-semibold text-gray-700">Recent Activity</h3>
-                  <div className="max-h-64 space-y-2 overflow-y-auto">
-                    {recentSyncs.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-start gap-2 rounded border p-3 text-sm"
-                      >
-                        {entry.status === 'processed' ? (
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
-                        ) : entry.status === 'failed' ? (
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                        ) : (
-                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-gray-900">
-                            {entry.subject || 'No subject'}
-                          </p>
-                          <p className="truncate text-gray-500">
-                            {entry.from_address || 'Unknown sender'}
-                          </p>
-                          {entry.error_message && (
-                            <p className="text-xs text-red-600">{entry.error_message}</p>
-                          )}
-                          <p className="text-xs text-gray-400">{formatDate(entry.created_at)}</p>
-                        </div>
-                        {entry.violation_id && (
-                          <a
-                            href={`/dashboard/${entry.violation_id}`}
-                            className="shrink-0 text-blue-600 hover:text-blue-800"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            /* Not connected state */
-            <div className="py-6 text-center">
-              <Mail className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-              <p className="mb-1 font-medium text-gray-900">No email connected</p>
-              <p className="mb-4 text-sm text-gray-500">
-                Connect your Gmail to automatically detect NOI emails from DC DOB.
-              </p>
-              <Button onClick={handleConnect} disabled={connecting}>
-                <Mail className="mr-2 h-4 w-4" />
-                {connecting ? 'Redirecting...' : 'Connect Gmail'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="team" className="mt-4">
           <TeamTab />
-        </TabsContent>
-
-        <TabsContent value="notifications" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Configure how and when you receive notifications.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium text-gray-900">Deadline alerts</p>
-                  <p className="text-sm text-gray-500">Email notifications for approaching and overdue deadlines</p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium text-gray-900">Status changes</p>
-                  <p className="text-sm text-gray-500">Email when violation or submission status changes</p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium text-gray-900">Daily digest</p>
-                  <p className="text-sm text-gray-500">Daily summary of all activity</p>
-                </div>
-                <Switch />
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="testing" className="mt-4">
