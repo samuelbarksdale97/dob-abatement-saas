@@ -20,6 +20,8 @@ function DashboardContent() {
   const [stats, setStats] = useState<ViolationStats | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Filter state from URL
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -60,6 +62,21 @@ function DashboardContent() {
     const data = await res.json();
     setStats(data);
   }, []);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/violations/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDeleteId(null);
+        fetchViolations();
+        fetchStats();
+      }
+    } catch (error) {
+      console.error('Failed to delete violation:', error);
+    }
+    setDeleting(false);
+  };
 
   useEffect(() => {
     fetchViolations();
@@ -186,7 +203,26 @@ function DashboardContent() {
           sortDir={sortDir}
           onSort={handleSort}
           onPageChange={setPage}
+          onDelete={(id) => setDeleteId(id)}
         />
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Infraction?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will permanently delete this infraction and all associated data (items, photos, work orders). This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteId(null)} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={() => handleDelete(deleteId)} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
