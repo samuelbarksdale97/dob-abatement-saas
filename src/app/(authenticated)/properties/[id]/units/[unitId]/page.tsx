@@ -9,33 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  ChevronRight, ChevronDown, User, Phone, Edit2, Building2,
-  AlertTriangle, Clock, Camera, Send, CheckCircle2, FileText,
+  ChevronRight, User, Phone, Edit2, Building2,
+  AlertTriangle, Clock, CheckCircle2, FileText,
   ArrowRight, DollarSign, Trash2, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { STATUS_COLORS, STATUS_LABELS, getDaysRemaining, getUrgencyColor } from '@/lib/status-transitions';
 import type { Unit, Violation, ViolationStatus } from '@/lib/types';
 
-// ── Phase & Action Grouping ──────────────────────────────────────
+// ── Action Grouping ──────────────────────────────────────────────
 
-type Phase = 'intake' | 'active' | 'submission' | 'resolution';
-
-const PHASE_STATUSES: Record<Phase, ViolationStatus[]> = {
-  intake: ['NEW', 'PARSING', 'PARSED'],
-  active: ['ASSIGNED', 'IN_PROGRESS', 'AWAITING_PHOTOS', 'PHOTOS_UPLOADED'],
-  submission: ['READY_FOR_SUBMISSION', 'SUBMITTED'],
-  resolution: ['APPROVED', 'REJECTED', 'ADDITIONAL_INFO_REQUESTED', 'CLOSED'],
-};
-
-const PHASE_META: Record<Phase, { label: string; color: string; bgColor: string }> = {
-  intake: { label: 'Intake', color: 'bg-slate-400', bgColor: 'bg-slate-50' },
-  active: { label: 'Active Work', color: 'bg-yellow-500', bgColor: 'bg-yellow-50' },
-  submission: { label: 'Submission', color: 'bg-teal-500', bgColor: 'bg-teal-50' },
-  resolution: { label: 'Resolution', color: 'bg-emerald-500', bgColor: 'bg-emerald-50' },
-};
-
-// Action-oriented grouping (Option 3)
 const NEEDS_ACTION_STATUSES: ViolationStatus[] = [
   'AWAITING_PHOTOS', 'READY_FOR_SUBMISSION', 'ADDITIONAL_INFO_REQUESTED', 'REJECTED',
 ];
@@ -56,150 +39,67 @@ function getActionLabel(status: ViolationStatus): string {
   }
 }
 
-function getPhase(status: ViolationStatus): Phase {
-  for (const [phase, statuses] of Object.entries(PHASE_STATUSES)) {
-    if (statuses.includes(status)) return phase as Phase;
-  }
-  return 'intake';
-}
 
-// ── Health Bar Component ─────────────────────────────────────────
+// ── Violation Card Component (compact grid style) ────────────────
 
-function HealthBar({ violations }: { violations: Violation[] }) {
-  const phases: Phase[] = ['intake', 'active', 'submission', 'resolution'];
-  const phaseCounts = phases.map(p => ({
-    phase: p,
-    count: violations.filter(v => PHASE_STATUSES[p].includes(v.status as ViolationStatus)).length,
-  }));
-  const total = violations.length;
-
-  // Compute verdict
-  const overdueCount = violations.filter(v => {
-    const days = getDaysRemaining(v.abatement_deadline);
-    return days !== null && days < 0 && !['APPROVED', 'CLOSED'].includes(v.status);
-  }).length;
-  const needsActionCount = violations.filter(v =>
-    NEEDS_ACTION_STATUSES.includes(v.status as ViolationStatus)
-  ).length;
-  const resolvedCount = violations.filter(v =>
-    ['APPROVED', 'CLOSED'].includes(v.status)
-  ).length;
-
-  let verdictText: string;
-  let verdictColor: string;
-  if (overdueCount > 0) {
-    verdictText = `${overdueCount} overdue — action required`;
-    verdictColor = 'text-red-600';
-  } else if (needsActionCount > 0) {
-    verdictText = `${needsActionCount} need${needsActionCount === 1 ? 's' : ''} your input`;
-    verdictColor = 'text-amber-600';
-  } else if (resolvedCount === total) {
-    verdictText = 'All resolved';
-    verdictColor = 'text-emerald-600';
-  } else {
-    verdictText = 'All on track';
-    verdictColor = 'text-emerald-600';
-  }
-
-  return (
-    <Card className="border-slate-200/60 rounded-2xl bg-white shadow-sm">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-slate-700">Pipeline Status</span>
-          <span className={`text-sm font-bold ${verdictColor}`}>{verdictText}</span>
-        </div>
-
-        {/* Phase bar */}
-        <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 mb-3">
-          {phaseCounts.map(({ phase, count }) => {
-            if (count === 0) return null;
-            const widthPercent = (count / total) * 100;
-            return (
-              <div
-                key={phase}
-                className={`${PHASE_META[phase].color} transition-all duration-500`}
-                style={{ width: `${widthPercent}%` }}
-                title={`${PHASE_META[phase].label}: ${count}`}
-              />
-            );
-          })}
-        </div>
-
-        {/* Phase legend */}
-        <div className="flex flex-wrap gap-x-5 gap-y-1">
-          {phaseCounts.map(({ phase, count }) => (
-            <div key={phase} className="flex items-center gap-1.5">
-              <div className={`h-2.5 w-2.5 rounded-full ${PHASE_META[phase].color}`} />
-              <span className="text-xs text-slate-500">
-                {PHASE_META[phase].label}
-              </span>
-              <span className="text-xs font-bold text-slate-700">{count}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Violation Row Component ──────────────────────────────────────
-
-function ViolationRow({ v, showAction, onDelete }: { v: Violation; showAction?: boolean; onDelete?: (id: string) => void }) {
+function ViolationCard({ v, onDelete }: { v: Violation; onDelete?: (id: string) => void }) {
   const days = getDaysRemaining(v.abatement_deadline);
   const urgencyColor = getUrgencyColor(v.abatement_deadline, v.status as ViolationStatus);
-  const actionLabel = showAction ? getActionLabel(v.status as ViolationStatus) : null;
+  const actionLabel = getActionLabel(v.status as ViolationStatus);
 
   return (
     <Link href={`/dashboard/${v.id}`}>
-      <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md border-slate-200/60 rounded-xl group bg-white">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                  {v.notice_id || 'Pending NOI'}
-                </span>
-                {v.priority && v.priority <= 2 && (
-                  <Badge variant="outline" className={`text-[0.6rem] font-bold rounded-md shrink-0 ${
-                    v.priority === 1 ? 'border-red-200 text-red-700 bg-red-50' : 'border-orange-200 text-orange-700 bg-orange-50'
-                  }`}>
-                    P{v.priority}
-                  </Badge>
-                )}
-              </div>
-              {actionLabel && (
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <ArrowRight className="h-3 w-3 text-amber-500 shrink-0" />
-                  <span className="text-xs font-semibold text-amber-700">{actionLabel}</span>
-                </div>
-              )}
-              <span className="text-xs text-slate-400 truncate block">
-                {v.infraction_address || 'Address pending'}
-              </span>
-            </div>
-
-            <div className="flex flex-col items-end gap-1.5 shrink-0">
-              <Badge
-                className={`text-[0.6rem] uppercase tracking-wider font-bold rounded-md ${STATUS_COLORS[v.status as ViolationStatus] || ''}`}
-              >
-                {STATUS_LABELS[v.status as ViolationStatus] || v.status}
+      <Card className="transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border-slate-200/60 rounded-2xl group bg-white h-full">
+        <CardContent className="p-5 flex flex-col h-full">
+          {/* Top: Notice ID + Priority */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+              {v.notice_id || 'Pending NOI'}
+            </span>
+            {v.priority && v.priority <= 2 && (
+              <Badge variant="outline" className={`text-[0.6rem] font-bold rounded-md shrink-0 ${
+                v.priority === 1 ? 'border-red-200 text-red-700 bg-red-50' : 'border-orange-200 text-orange-700 bg-orange-50'
+              }`}>
+                P{v.priority}
               </Badge>
-              <div className="flex items-center gap-2">
-                {(v.total_fines ?? 0) > 0 && (
-                  <span className="text-xs font-semibold text-slate-500">
-                    ${(v.total_fines ?? 0).toLocaleString()}
-                  </span>
-                )}
-                {days !== null && !['APPROVED', 'CLOSED'].includes(v.status) && (
-                  <span className={`text-xs ${urgencyColor}`}>
-                    {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d left`}
-                  </span>
-                )}
-              </div>
+            )}
+          </div>
+
+          {/* Fines (prominent) */}
+          {(v.total_fines ?? 0) > 0 && (
+            <span className="text-lg font-black tracking-tight text-slate-900 mb-1">
+              ${(v.total_fines ?? 0).toLocaleString()}
+            </span>
+          )}
+
+          {/* Action hint */}
+          {actionLabel && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <ArrowRight className="h-3 w-3 text-amber-500 shrink-0" />
+              <span className="text-xs font-semibold text-amber-700">{actionLabel}</span>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Footer: Status + Deadline + Delete */}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+            <Badge
+              className={`text-[0.6rem] uppercase tracking-wider font-bold rounded-md ${STATUS_COLORS[v.status as ViolationStatus] || ''}`}
+            >
+              {STATUS_LABELS[v.status as ViolationStatus] || v.status}
+            </Badge>
+            <div className="flex items-center gap-2">
+              {days !== null && !['APPROVED', 'CLOSED'].includes(v.status) && (
+                <span className={`text-xs font-medium ${urgencyColor}`}>
+                  {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`}
+                </span>
+              )}
               {onDelete && (
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(v.id); }}
-                  className="rounded-lg p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  className="rounded-lg p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
                   title="Delete violation"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -213,54 +113,15 @@ function ViolationRow({ v, showAction, onDelete }: { v: Violation; showAction?: 
   );
 }
 
-// ── Collapsible Section ──────────────────────────────────────────
+// ── Tab Definitions ──────────────────────────────────────────────
 
-function ViolationSection({
-  title,
-  icon: Icon,
-  violations,
-  showAction,
-  defaultOpen,
-  accentColor,
-  onDelete,
-}: {
-  title: string;
-  icon: React.ElementType;
-  violations: Violation[];
-  showAction?: boolean;
-  defaultOpen: boolean;
-  accentColor: string;
-  onDelete?: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+type ViolationTab = 'action' | 'progress' | 'resolved';
 
-  if (violations.length === 0) return null;
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full text-left mb-2 group/section"
-      >
-        <div className={`rounded-lg p-1.5 ${accentColor}`}>
-          <Icon className="h-4 w-4" />
-        </div>
-        <span className="text-sm font-bold text-slate-800 flex-1">
-          {title}
-          <span className="ml-1.5 text-xs font-semibold text-slate-400">({violations.length})</span>
-        </span>
-        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
-      </button>
-      {open && (
-        <div className="space-y-2 ml-1 pl-4 border-l-2 border-slate-100">
-          {violations.map((v) => (
-            <ViolationRow key={v.id} v={v} showAction={showAction} onDelete={onDelete} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+const TAB_CONFIG: Record<ViolationTab, { label: string; icon: React.ElementType; emptyText: string; color: string }> = {
+  action:   { label: 'Needs Action',  icon: AlertTriangle, emptyText: 'No violations need your input right now.',        color: 'text-amber-600 border-amber-500' },
+  progress: { label: 'In Progress',   icon: Clock,         emptyText: 'No violations currently in progress.',            color: 'text-blue-600 border-blue-500' },
+  resolved: { label: 'Resolved',      icon: CheckCircle2,  emptyText: 'No resolved or inactive violations yet.',         color: 'text-emerald-600 border-emerald-500' },
+};
 
 // ── Main Page ────────────────────────────────────────────────────
 
@@ -283,6 +144,9 @@ export default function UnitDetailPage() {
     notes: '',
   });
   const [editSaving, setEditSaving] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<ViolationTab>('action');
 
   // Delete state
   const [deleteConfirm, setDeleteConfirm] = useState<'unit' | 'violation' | null>(null);
@@ -511,69 +375,79 @@ export default function UnitDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Violations section */}
-        {violations.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-16 text-center">
-            <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 mb-4">
-                 <AlertTriangle className="h-10 w-10 text-slate-400" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">No violations found</h3>
-              <p className="mb-4 mt-2 text-sm text-slate-500">
-                Violations for this unit will appear here once they are linked to the unit through an uploaded NOI.
-              </p>
-              <Link href="/parse">
-                <Button variant="outline" className="rounded-xl mt-2 bg-white">
-                  Upload New NOI
-                </Button>
-              </Link>
-            </div>
+        {/* Violations tabbed view */}
+        <div className="space-y-4">
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200">
+            {(Object.entries(TAB_CONFIG) as [ViolationTab, typeof TAB_CONFIG[ViolationTab]][]).map(([key, config]) => {
+              const Icon = config.icon;
+              const count = key === 'action' ? needsAction.length : key === 'progress' ? inProgress.length : inactive.length;
+              const isActive = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                    isActive
+                      ? config.color
+                      : 'text-slate-400 border-transparent hover:text-slate-600'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {config.label}
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                    isActive ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Health bar (Option 1) */}
-            <HealthBar violations={violations} />
 
-            {/* Attention banner */}
-            {overdueCount > 0 && (
-              <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-                <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-                <span className="text-sm font-semibold text-red-800">
-                  {overdueCount} violation{overdueCount !== 1 ? 's' : ''} past deadline — immediate action required
-                </span>
+          {/* Tab content */}
+          {(() => {
+            const tabViolations = activeTab === 'action' ? needsAction : activeTab === 'progress' ? inProgress : inactive;
+            const config = TAB_CONFIG[activeTab];
+
+            if (tabViolations.length === 0) {
+              return (
+                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-12 text-center">
+                  <div className="mx-auto flex max-w-[360px] flex-col items-center justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 mb-3">
+                      <config.icon className="h-7 w-7 text-slate-400" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-500">{config.emptyText}</p>
+                    {violations.length === 0 && (
+                      <>
+                        <p className="mt-2 text-xs text-slate-400">
+                          Violations will appear here once linked through an uploaded NOI.
+                        </p>
+                        <Link href="/parse">
+                          <Button variant="outline" className="rounded-xl mt-4 bg-white" size="sm">
+                            Upload New NOI
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {tabViolations.map((v) => (
+                  <ViolationCard
+                    key={v.id}
+                    v={v}
+                    onDelete={(id: string) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
+                  />
+                ))}
               </div>
-            )}
-
-            {/* Action-oriented sections (Option 3) */}
-            <ViolationSection
-              title="Needs Your Action"
-              icon={AlertTriangle}
-              violations={needsAction}
-              showAction
-              defaultOpen
-              accentColor="bg-amber-100 text-amber-700"
-              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
-            />
-
-            <ViolationSection
-              title="In Progress"
-              icon={Clock}
-              violations={inProgress}
-              defaultOpen
-              accentColor="bg-blue-100 text-blue-700"
-              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
-            />
-
-            <ViolationSection
-              title="Not Started / Resolved"
-              icon={CheckCircle2}
-              violations={inactive}
-              defaultOpen={inactive.length <= 3}
-              accentColor="bg-slate-100 text-slate-500"
-              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
-            />
-          </div>
-        )}
+            );
+          })()}
+        </div>
       </div>
 
       {/* Edit Details Modal */}
