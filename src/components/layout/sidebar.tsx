@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Table,
   FileUp,
-  ClipboardList,
   LogOut,
   Settings,
   Users,
@@ -37,11 +36,8 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-[calc(100vh-1rem)] w-[240px] flex-col bg-transparent pl-2 pb-2">
-      <div className="flex h-20 items-center justify-start gap-3 px-6 mb-4 mt-2">
-        <div className="flex items-center justify-center p-2 rounded-xl bg-slate-900 text-white shadow-md">
-          <ClipboardList className="h-6 w-6" />
-        </div>
-        <span className="text-lg font-bold tracking-tight text-slate-900">Nexark</span>
+      <div className="flex h-20 items-center justify-start px-4 mb-4 mt-2">
+        <img src="/logo.png" alt="Yoke Partners" className="h-12 w-auto" />
       </div>
 
       <nav className="flex-1 space-y-1.5 px-4">
