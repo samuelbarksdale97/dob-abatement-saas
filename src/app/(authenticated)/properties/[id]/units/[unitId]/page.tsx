@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import {
   ChevronRight, User, Phone, Edit2, Building2,
   AlertTriangle, Clock, CheckCircle2, FileText,
-  ArrowRight, DollarSign, Trash2, X,
+  ArrowRight, DollarSign, Trash2, X, Send,
 } from 'lucide-react';
 import Link from 'next/link';
 import { STATUS_COLORS, STATUS_LABELS, getDaysRemaining, getUrgencyColor } from '@/lib/status-transitions';
@@ -24,9 +24,12 @@ const NEEDS_ACTION_STATUSES: ViolationStatus[] = [
   // TODO: Add 'ADDITIONAL_INFO_REQUESTED' once DOB response tracking is implemented
 ];
 const IN_PROGRESS_STATUSES: ViolationStatus[] = [
-  'ASSIGNED', 'IN_PROGRESS', 'AWAITING_PHOTOS', 'PHOTOS_UPLOADED', 'SUBMITTED',
+  'ASSIGNED', 'IN_PROGRESS', 'AWAITING_PHOTOS', 'PHOTOS_UPLOADED',
 ];
-const INACTIVE_STATUSES: ViolationStatus[] = [
+const SUBMITTED_STATUSES: ViolationStatus[] = [
+  'SUBMITTED',
+];
+const RESOLVED_STATUSES: ViolationStatus[] = [
   'APPROVED', 'CLOSED',
 ];
 
@@ -118,12 +121,13 @@ function ViolationCard({ v, onDelete }: { v: Violation; onDelete?: (id: string) 
 
 // ── Tab Definitions ──────────────────────────────────────────────
 
-type ViolationTab = 'action' | 'progress' | 'resolved';
+type ViolationTab = 'action' | 'progress' | 'submitted' | 'resolved';
 
 const TAB_CONFIG: Record<ViolationTab, { label: string; icon: React.ElementType; emptyText: string; color: string }> = {
-  action:   { label: 'Needs Action',  icon: AlertTriangle, emptyText: 'No violations need your input right now.',        color: 'text-amber-600 border-amber-500' },
-  progress: { label: 'In Progress',   icon: Clock,         emptyText: 'No violations currently in progress.',            color: 'text-blue-600 border-blue-500' },
-  resolved: { label: 'Resolved',      icon: CheckCircle2,  emptyText: 'No resolved or inactive violations yet.',         color: 'text-emerald-600 border-emerald-500' },
+  action:    { label: 'Needs Action',  icon: AlertTriangle, emptyText: 'No violations need your input right now.',        color: 'text-amber-600 border-amber-500' },
+  progress:  { label: 'In Progress',   icon: Clock,         emptyText: 'No violations currently in progress.',            color: 'text-blue-600 border-blue-500' },
+  submitted: { label: 'Submitted',     icon: Send,          emptyText: 'No violations have been submitted to DOB yet.',   color: 'text-teal-600 border-teal-500' },
+  resolved:  { label: 'Resolved',      icon: CheckCircle2,  emptyText: 'No resolved violations yet.',                     color: 'text-emerald-600 border-emerald-500' },
 };
 
 // ── Main Page ────────────────────────────────────────────────────
@@ -271,11 +275,13 @@ export default function UnitDetailPage() {
     .filter(v => IN_PROGRESS_STATUSES.includes(v.status as ViolationStatus))
     .sort((a, b) => (a.priority || 3) - (b.priority || 3));
 
-  const inactive = violations
-    .filter(v => INACTIVE_STATUSES.includes(v.status as ViolationStatus))
+  const submitted = violations
+    .filter(v => SUBMITTED_STATUSES.includes(v.status as ViolationStatus));
+
+  const resolved = violations
+    .filter(v => RESOLVED_STATUSES.includes(v.status as ViolationStatus))
     .sort((a, b) => {
-      // Show NEW/PARSING/PARSED before APPROVED/CLOSED
-      const order: Record<string, number> = { NEW: 0, PARSING: 1, PARSED: 2, APPROVED: 3, CLOSED: 4 };
+      const order: Record<string, number> = { APPROVED: 0, CLOSED: 1 };
       return (order[a.status] ?? 5) - (order[b.status] ?? 5);
     });
 
@@ -384,7 +390,7 @@ export default function UnitDetailPage() {
           <div className="flex border-b border-slate-200">
             {(Object.entries(TAB_CONFIG) as [ViolationTab, typeof TAB_CONFIG[ViolationTab]][]).map(([key, config]) => {
               const Icon = config.icon;
-              const count = key === 'action' ? needsAction.length : key === 'progress' ? inProgress.length : inactive.length;
+              const count = key === 'action' ? needsAction.length : key === 'progress' ? inProgress.length : key === 'submitted' ? submitted.length : resolved.length;
               const isActive = activeTab === key;
               return (
                 <button
@@ -410,7 +416,7 @@ export default function UnitDetailPage() {
 
           {/* Tab content */}
           {(() => {
-            const tabViolations = activeTab === 'action' ? needsAction : activeTab === 'progress' ? inProgress : inactive;
+            const tabViolations = activeTab === 'action' ? needsAction : activeTab === 'progress' ? inProgress : activeTab === 'submitted' ? submitted : resolved;
             const config = TAB_CONFIG[activeTab];
 
             if (tabViolations.length === 0) {
