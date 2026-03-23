@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
             { step: 'insert_records', status: 'pending' },
             { step: 'analyze_pages', status: 'pending' },
             { step: 'match_photos', status: 'pending' },
-            { step: 'render_images', status: 'pending' },
             { step: 'complete', status: 'pending' },
           ],
         },

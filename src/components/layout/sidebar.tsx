@@ -10,7 +10,6 @@ import {
   Settings,
   Users,
   BarChart3,
-  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -37,11 +36,12 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-[calc(100vh-1rem)] w-[240px] flex-col bg-transparent pl-2 pb-2">
-      <div className="flex h-20 items-center justify-start gap-3 px-4 mb-4 mt-2">
-        <div className="flex items-center justify-center p-2 rounded-xl bg-slate-900 text-white shadow-md">
-          <Building2 className="h-6 w-6" />
-        </div>
-        <img src="/logo.png" alt="Yoke Management Partners" className="h-10 w-auto" />
+      <div className="flex h-20 items-center justify-start px-5 mb-4 mt-2">
+        <span className="text-xl font-black tracking-tight leading-tight">
+          <span className="text-red-600">Yoke</span>{' '}
+          <span className="text-slate-900">Management</span>{' '}
+          <span className="text-red-600">Partners</span>
+        </span>
       </div>
 
       <nav className="flex-1 space-y-1.5 px-4">
