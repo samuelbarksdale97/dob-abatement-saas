@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@google/genai": "^1.41.0",
+    "@napi-rs/canvas": "^0.1.97",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "@types/papaparse": "^5.5.2",
-    "canvas": "^3.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
