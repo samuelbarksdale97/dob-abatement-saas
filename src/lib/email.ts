@@ -4,7 +4,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Nexark <noreply@nexark.ai>';
+export const FROM_EMAIL = process.env.FROM_EMAIL || 'Yoke Management Partners <noreply@nexark.ai>';
 
 interface SendEmailOptions {
   to: string | string[];

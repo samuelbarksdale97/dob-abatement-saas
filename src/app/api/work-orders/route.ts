@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { canTransition } from '@/lib/status-transitions';
 import { Resend } from 'resend';
 import { randomUUID } from 'crypto';
+import { FROM_EMAIL } from '@/lib/email';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
     try {
       if (resend) {
         await resend.emails.send({
-          from: 'DOB Abatement <noreply@yourdomain.com>', // TODO: Update with actual domain
+          from: FROM_EMAIL,
           to: contractor_email,
           subject: `Work Order Assignment - ${violation.infraction_address || violation.notice_id}`,
           html: `
@@ -230,7 +231,7 @@ export async function POST(request: NextRequest) {
               </p>
 
               <p style="color: #6b7280; font-size: 14px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-                DOB Abatement System
+                Yoke Management Partners
               </p>
             </div>
           `,

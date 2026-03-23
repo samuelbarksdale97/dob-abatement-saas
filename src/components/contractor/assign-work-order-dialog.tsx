@@ -33,7 +33,7 @@ export function AssignWorkOrderDialog({
 }: AssignWorkOrderDialogProps) {
   const [loading, setLoading] = useState(false);
   const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [mode, setMode] = useState<'select' | 'new'>('select');
+  const [mode, setMode] = useState<'select' | 'new'>('new');
   const [selectedContractorId, setSelectedContractorId] = useState<string>('');
   const [formData, setFormData] = useState({
     contractor_name: '',
@@ -51,15 +51,12 @@ export function AssignWorkOrderDialog({
         .then((data) => {
           const list = data.contractors || [];
           setContractors(list);
-          // If no existing contractors, default to new entry mode
-          if (list.length === 0) setMode('new');
-          else setMode('select');
         })
         .catch(() => setContractors([]));
     } else {
       // Reset state when dialog closes
       setSelectedContractorId('');
-      setMode('select');
+      setMode('new');
     }
   }, [open]);
 
@@ -208,7 +205,6 @@ export function AssignWorkOrderDialog({
                       {contractors.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name} ({c.email})
-                          {c.total_assignments > 0 && ` — ${c.total_assignments} assignments`}
                         </SelectItem>
                       ))}
                     </SelectContent>
