@@ -226,16 +226,15 @@ async function renderItemPage(
     const dateLabelW = doc.getTextWidth('Date of Infraction: ');
     doc.setFont('helvetica', 'normal');
     doc.text(item.date_of_infraction, MARGIN + dateLabelW, y);
-    if (item.time_of_infraction) {
-      const dateEndX = MARGIN + dateLabelW + doc.getTextWidth(item.date_of_infraction);
-      const gap = 20; // Fixed gap between date value and time label
-      doc.setFont('helvetica', 'bold');
-      const timeLabel = 'Time of Infraction: ';
-      doc.text(timeLabel, dateEndX + gap, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(item.time_of_infraction, dateEndX + gap + doc.getTextWidth(timeLabel), y);
-    }
     y += 14;
+    if (item.time_of_infraction) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Time of Infraction: ', MARGIN, y);
+      const timeLabelW = doc.getTextWidth('Time of Infraction: ');
+      doc.setFont('helvetica', 'normal');
+      doc.text(item.time_of_infraction, MARGIN + timeLabelW, y);
+      y += 14;
+    }
   }
 
   y += 10;
