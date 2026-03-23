@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpDown, Trash2 } from 'lucide-react';
 import type { Violation, SortField, SortDirection } from '@/lib/types';
 import {
   STATUS_LABELS,
@@ -32,6 +32,7 @@ interface ViolationTableProps {
   sortDir: SortDirection;
   onSort: (field: SortField) => void;
   onPageChange: (page: number) => void;
+  onDelete?: (id: string) => void;
 }
 
 export function ViolationTable({
@@ -43,6 +44,7 @@ export function ViolationTable({
   sortDir,
   onSort,
   onPageChange,
+  onDelete,
 }: ViolationTableProps) {
   const totalPages = Math.ceil(total / pageSize);
 
@@ -70,6 +72,7 @@ export function ViolationTable({
             <SortableHeader field="abatement_deadline">Deadline</SortableHeader>
             <TableHead className="font-semibold text-slate-700">Status</TableHead>
             <TableHead className="font-semibold text-slate-700">Items</TableHead>
+            {onDelete && <TableHead className="w-10" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -120,6 +123,17 @@ export function ViolationTable({
                   <TableCell className="py-4 text-sm font-semibold text-slate-500">
                     {(v.violation_items as unknown as { count: number }[])?.[0]?.count ?? 0}
                   </TableCell>
+                  {onDelete && (
+                    <TableCell className="py-4">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(v.id); }}
+                        className="rounded-lg p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Delete infraction"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })
