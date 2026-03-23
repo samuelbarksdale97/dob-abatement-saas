@@ -45,6 +45,20 @@ export function normalizeAddress(raw: string): { street: string; unit: string | 
 
   let address = raw.trim().toLowerCase();
 
+  // Strip city, state, and zip code FIRST (before unit extraction)
+  // so patterns like "APT WASHINGTON DC 20032" don't confuse unit parsing.
+  address = address
+    .replace(/,?\s*washington\s*,?\s*d\.?c\.?\s*\d{5}(-\d{4})?/i, '')
+    .replace(/,?\s*washington\s*,?\s*d\.?c\.?/i, '')
+    .replace(/\s+d\.?c\.?\s*\d{5}(-\d{4})?\s*$/i, '') // "DC 20032" at end
+    .replace(/\s+\d{5}(-\d{4})?\s*$/, '') // trailing zip code only
+    .trim();
+
+  // Strip orphaned unit prefixes with no number (e.g. ", APT" left after city/zip removal)
+  address = address
+    .replace(/,?\s*(unit|apt|apartment|suite|ste)[.:\s]*$/i, '')
+    .trim();
+
   // Extract unit from common patterns: "Unit:103", "Apt 2B", "Suite 100", "#3"
   let unit: string | null = null;
   const unitPatterns = [
