@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Nav } from '@/components/layout/nav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   ChevronRight, ChevronDown, User, Phone, Edit2, Building2,
   AlertTriangle, Clock, Camera, Send, CheckCircle2, FileText,
-  ArrowRight, DollarSign,
+  ArrowRight, DollarSign, Trash2, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { STATUS_COLORS, STATUS_LABELS, getDaysRemaining, getUrgencyColor } from '@/lib/status-transitions';
@@ -142,7 +144,7 @@ function HealthBar({ violations }: { violations: Violation[] }) {
 
 // ── Violation Row Component ──────────────────────────────────────
 
-function ViolationRow({ v, showAction }: { v: Violation; showAction?: boolean }) {
+function ViolationRow({ v, showAction, onDelete }: { v: Violation; showAction?: boolean; onDelete?: (id: string) => void }) {
   const days = getDaysRemaining(v.abatement_deadline);
   const urgencyColor = getUrgencyColor(v.abatement_deadline, v.status as ViolationStatus);
   const actionLabel = showAction ? getActionLabel(v.status as ViolationStatus) : null;
@@ -194,6 +196,15 @@ function ViolationRow({ v, showAction }: { v: Violation; showAction?: boolean })
                   </span>
                 )}
               </div>
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(v.id); }}
+                  className="rounded-lg p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Delete violation"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -211,6 +222,7 @@ function ViolationSection({
   showAction,
   defaultOpen,
   accentColor,
+  onDelete,
 }: {
   title: string;
   icon: React.ElementType;
@@ -218,6 +230,7 @@ function ViolationSection({
   showAction?: boolean;
   defaultOpen: boolean;
   accentColor: string;
+  onDelete?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -241,7 +254,7 @@ function ViolationSection({
       {open && (
         <div className="space-y-2 ml-1 pl-4 border-l-2 border-slate-100">
           {violations.map((v) => (
-            <ViolationRow key={v.id} v={v} showAction={showAction} />
+            <ViolationRow key={v.id} v={v} showAction={showAction} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -256,9 +269,25 @@ export default function UnitDetailPage() {
   const propertyId = params.id as string;
   const unitId = params.unitId as string;
 
+  const router = useRouter();
   const [unit, setUnit] = useState<Unit | null>(null);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Edit modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    is_vacant: true,
+    occupant_name: '',
+    occupant_phone: '',
+    notes: '',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete state
+  const [deleteConfirm, setDeleteConfirm] = useState<'unit' | 'violation' | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUnit = useCallback(async () => {
     setLoading(true);
@@ -282,6 +311,65 @@ export default function UnitDetailPage() {
   useEffect(() => {
     fetchUnit();
   }, [fetchUnit]);
+
+  const openEditModal = () => {
+    if (unit) {
+      setEditForm({
+        is_vacant: unit.is_vacant ?? true,
+        occupant_name: unit.occupant_name || '',
+        occupant_phone: unit.occupant_phone || '',
+        notes: unit.notes || '',
+      });
+      setEditOpen(true);
+    }
+  };
+
+  const saveEdit = async () => {
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/properties/${propertyId}/units/${unitId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      if (res.ok) {
+        setEditOpen(false);
+        fetchUnit();
+      }
+    } catch (error) {
+      console.error('Failed to save unit:', error);
+    }
+    setEditSaving(false);
+  };
+
+  const handleDeleteUnit = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/properties/${propertyId}/units/${unitId}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push(`/properties/${propertyId}`);
+      }
+    } catch (error) {
+      console.error('Failed to delete unit:', error);
+    }
+    setDeleting(false);
+    setDeleteConfirm(null);
+  };
+
+  const handleDeleteViolation = async (violationId: string) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/violations/${violationId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchUnit();
+      }
+    } catch (error) {
+      console.error('Failed to delete violation:', error);
+    }
+    setDeleting(false);
+    setDeleteConfirm(null);
+    setDeleteTargetId(null);
+  };
 
   if (loading) {
     return (
@@ -378,10 +466,20 @@ export default function UnitDetailPage() {
                   )}
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm transition-all hover:bg-slate-50">
-                <Edit2 className="mr-2 h-4 w-4" />
-                Edit Details
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={openEditModal} className="rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm transition-all hover:bg-slate-50">
+                  <Edit2 className="mr-2 h-4 w-4" />
+                  Edit Details
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteConfirm('unit')}
+                  className="rounded-xl border-red-200 text-red-600 hover:text-red-900 hover:bg-red-50 shadow-sm transition-all"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -454,6 +552,7 @@ export default function UnitDetailPage() {
               showAction
               defaultOpen
               accentColor="bg-amber-100 text-amber-700"
+              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
             />
 
             <ViolationSection
@@ -462,6 +561,7 @@ export default function UnitDetailPage() {
               violations={inProgress}
               defaultOpen
               accentColor="bg-blue-100 text-blue-700"
+              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
             />
 
             <ViolationSection
@@ -470,10 +570,129 @@ export default function UnitDetailPage() {
               violations={inactive}
               defaultOpen={inactive.length <= 3}
               accentColor="bg-slate-100 text-slate-500"
+              onDelete={(id) => { setDeleteTargetId(id); setDeleteConfirm('violation'); }}
             />
           </div>
         )}
       </div>
+
+      {/* Edit Details Modal */}
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-slate-900">Edit Unit Details</h3>
+              <button onClick={() => setEditOpen(false)} className="rounded-lg p-1.5 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold text-slate-700">Occupancy Status</Label>
+                <div className="flex gap-2 mt-1.5">
+                  <Button
+                    size="sm"
+                    variant={!editForm.is_vacant ? 'default' : 'outline'}
+                    onClick={() => setEditForm(f => ({ ...f, is_vacant: false }))}
+                    className="rounded-lg flex-1"
+                  >
+                    Occupied
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={editForm.is_vacant ? 'default' : 'outline'}
+                    onClick={() => setEditForm(f => ({ ...f, is_vacant: true, occupant_name: '', occupant_phone: '' }))}
+                    className="rounded-lg flex-1"
+                  >
+                    Vacant
+                  </Button>
+                </div>
+              </div>
+
+              {!editForm.is_vacant && (
+                <>
+                  <div>
+                    <Label htmlFor="occupant_name" className="text-sm font-semibold text-slate-700">Occupant Name</Label>
+                    <Input
+                      id="occupant_name"
+                      value={editForm.occupant_name}
+                      onChange={e => setEditForm(f => ({ ...f, occupant_name: e.target.value }))}
+                      placeholder="Full name"
+                      className="mt-1.5 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="occupant_phone" className="text-sm font-semibold text-slate-700">Contact Phone</Label>
+                    <Input
+                      id="occupant_phone"
+                      value={editForm.occupant_phone}
+                      onChange={e => setEditForm(f => ({ ...f, occupant_phone: e.target.value }))}
+                      placeholder="(202) 555-0100"
+                      className="mt-1.5 rounded-lg"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="notes" className="text-sm font-semibold text-slate-700">Notes</Label>
+                <textarea
+                  id="notes"
+                  value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Optional notes about this unit..."
+                  rows={3}
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
+              <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-lg">Cancel</Button>
+              <Button onClick={saveEdit} disabled={editSaving} className="rounded-lg">
+                {editSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Unit Confirmation */}
+      {deleteConfirm === 'unit' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Unit {unit.unit_number}?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will permanently delete this unit and all {violations.length} associated violation{violations.length !== 1 ? 's' : ''}, including their photos, work orders, and submission data. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteUnit} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete Unit'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Violation Confirmation */}
+      {deleteConfirm === 'violation' && deleteTargetId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Violation?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will permanently delete this violation and all associated data (items, photos, work orders). This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setDeleteConfirm(null); setDeleteTargetId(null); }} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={() => handleDeleteViolation(deleteTargetId)} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete Violation'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

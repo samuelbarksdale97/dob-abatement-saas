@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Nav } from '@/components/layout/nav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Plus, DollarSign, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Building2, Plus, DollarSign, AlertTriangle, ChevronRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/status-transitions';
 import type { ViolationStatus } from '@/lib/types';
@@ -41,8 +41,11 @@ export default function PropertyDetailPage() {
   const params = useParams();
   const propertyId = params.id as string;
 
+  const router = useRouter();
   const [detail, setDetail] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -78,6 +81,20 @@ export default function PropertyDetailPage() {
     fetchDetail();
   }, [fetchDetail]);
 
+  const handleDeleteProperty = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/properties/${propertyId}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      console.error('Failed to delete property:', error);
+    }
+    setDeleting(false);
+    setDeleteConfirm(false);
+  };
+
   if (loading) {
     return (
       <div>
@@ -102,12 +119,23 @@ export default function PropertyDetailPage() {
     <div>
       <Nav title={detail.property.address || 'Property Detail'} />
       <div className="space-y-6 p-6">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/dashboard" className="hover:text-gray-700">Portfolio</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-gray-900">{detail.property.address}</span>
-        </nav>
+        {/* Breadcrumb + actions */}
+        <div className="flex items-center justify-between">
+          <nav className="flex items-center gap-2 text-sm text-gray-500">
+            <Link href="/dashboard" className="hover:text-gray-700">Portfolio</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-gray-900">{detail.property.address}</span>
+          </nav>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDeleteConfirm(true)}
+            className="rounded-xl border-red-200 text-red-600 hover:text-red-900 hover:bg-red-50 shadow-sm transition-all"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Property
+          </Button>
+        </div>
 
         {/* Stats bar */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -200,6 +228,24 @@ export default function PropertyDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Property Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete {detail.property.address}?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will permanently delete this property, all {detail.units.length} unit{detail.units.length !== 1 ? 's' : ''}, and all {detail.total_violations} associated violation{detail.total_violations !== 1 ? 's' : ''} including their photos, work orders, and submission data. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(false)} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteProperty} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete Property'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

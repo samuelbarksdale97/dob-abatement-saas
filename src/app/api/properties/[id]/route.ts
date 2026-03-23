@@ -41,6 +41,64 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check user role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || !['OWNER', 'ADMIN'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    // Get all violations for this property to cascade-delete their related records
+    const { data: violations } = await supabase
+      .from('violations')
+      .select('id')
+      .eq('property_id', id);
+
+    if (violations && violations.length > 0) {
+      const violationIds = violations.map(v => v.id);
+      // Delete in dependency order
+      await supabase.from('photos').delete().in('violation_id', violationIds);
+      await supabase.from('violation_items').delete().in('violation_id', violationIds);
+      await supabase.from('work_orders').delete().in('violation_id', violationIds);
+      await supabase.from('contractor_tokens').delete().in('violation_id', violationIds);
+      await supabase.from('audit_log').delete().in('violation_id', violationIds);
+      await supabase.from('violations').delete().in('id', violationIds);
+    }
+
+    // Units cascade via FK ON DELETE CASCADE, but delete explicitly for clarity
+    await supabase.from('units').delete().eq('property_id', id);
+
+    // Delete the property
+    const { error } = await supabase.from('properties').delete().eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Property delete error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

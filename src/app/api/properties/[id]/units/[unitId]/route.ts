@@ -1,6 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string; unitId: string }> }
+) {
+  try {
+    const { unitId } = await params;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || !['OWNER', 'ADMIN'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    // Get violations linked to this unit
+    const { data: violations } = await supabase
+      .from('violations')
+      .select('id')
+      .eq('unit_id', unitId);
+
+    if (violations && violations.length > 0) {
+      const violationIds = violations.map(v => v.id);
+      await supabase.from('photos').delete().in('violation_id', violationIds);
+      await supabase.from('violation_items').delete().in('violation_id', violationIds);
+      await supabase.from('work_orders').delete().in('violation_id', violationIds);
+      await supabase.from('contractor_tokens').delete().in('violation_id', violationIds);
+      await supabase.from('audit_log').delete().in('violation_id', violationIds);
+      await supabase.from('violations').delete().in('id', violationIds);
+    }
+
+    const { error } = await supabase.from('units').delete().eq('id', unitId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Unit delete error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; unitId: string }> }
