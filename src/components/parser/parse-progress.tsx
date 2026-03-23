@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   CheckCircle,
@@ -44,14 +43,6 @@ const STEP_CONFIG: Record<string, { label: string; icon: React.ElementType; desc
   match_photos:   { label: 'Photo Matching',  icon: ImageIcon,   description: 'Linking evidence photos to violation items' },
   complete:       { label: 'Complete',         icon: PartyPopper, description: 'Finalizing and verifying all data' },
 };
-
-function formatDuration(startIso: string, endIso: string): string {
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-}
 
 function formatSeconds(totalSecs: number): string {
   const m = Math.floor(totalSecs / 60);
@@ -170,13 +161,6 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
     return acc;
   }, 0);
 
-  // Format elapsed for a running step
-  const formatStepElapsed = (startIso: string): string => {
-    const secs = Math.floor((Date.now() - new Date(startIso).getTime()) / 1000);
-    if (secs < 60) return `${secs}s`;
-    return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-  };
-
   // Filter to only visible steps, keeping order
   const visibleSteps = VISIBLE_STEPS.map(name =>
     steps.find(s => s.step === name) || { step: name, status: 'pending' as const },
@@ -262,18 +246,6 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
                   }`}>
                     {config?.label || step.step}
                   </p>
-                  {/* Duration badge for completed steps */}
-                  {isDone && step.started_at && step.completed_at && (
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 border-emerald-200 bg-emerald-50">
-                      {formatDuration(step.started_at, step.completed_at)}
-                    </Badge>
-                  )}
-                  {/* Elapsed badge for running step */}
-                  {isActive && step.started_at && (
-                    <Badge variant="outline" className="animate-pulse text-[10px] uppercase font-bold tracking-wider text-blue-600 border-blue-200 bg-blue-50">
-                      {formatStepElapsed(step.started_at)}
-                    </Badge>
-                  )}
                 </div>
                 <p className="mt-1 text-sm font-medium text-slate-500">
                   {step.message || config?.description}

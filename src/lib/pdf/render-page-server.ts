@@ -26,24 +26,24 @@ export async function renderPdfPages(
   const { pdf } = await import('pdf-to-img');
 
   const document = await pdf(pdfBuffer, { scale });
-
   const results: RenderedPage[] = [];
-  let currentPage = 1;
 
-  for await (const image of document) {
-    if (pageNumbers.includes(currentPage)) {
-      const buffer = Buffer.from(image);
+  // Use getPage() to jump directly to specific pages instead of
+  // iterating through every page in the PDF sequentially
+  for (const pageNumber of pageNumbers) {
+    if (pageNumber < 1 || pageNumber > document.length) continue;
+
+    try {
+      const buffer = await document.getPage(pageNumber);
       results.push({
-        pageNumber: currentPage,
+        pageNumber,
         buffer,
-        width: 0,  // pdf-to-img doesn't expose dimensions directly
+        width: 0,
         height: 0,
       });
+    } catch (err) {
+      console.error(`Failed to render page ${pageNumber}:`, err);
     }
-    currentPage++;
-
-    // Early exit if we've rendered all requested pages
-    if (results.length === pageNumbers.length) break;
   }
 
   return results;
