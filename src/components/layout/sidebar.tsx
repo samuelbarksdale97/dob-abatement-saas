@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Table,
   FileUp,
-  Upload,
   ClipboardList,
   LogOut,
   Settings,
@@ -23,7 +22,6 @@ const navItems = [
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/parse', label: 'Parse NOI', icon: FileUp },
-  { href: '/import', label: 'CSV Import', icon: Upload },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
