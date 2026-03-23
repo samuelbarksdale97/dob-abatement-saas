@@ -195,7 +195,7 @@ function DashboardContent() {
 export default function ViolationsPage() {
   return (
     <div>
-      <Nav title="All Violations" />
+      <Nav title="All Infractions" />
       <Suspense fallback={
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />

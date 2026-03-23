@@ -20,20 +20,23 @@ import type { Unit, Violation, ViolationStatus } from '@/lib/types';
 // ── Action Grouping ──────────────────────────────────────────────
 
 const NEEDS_ACTION_STATUSES: ViolationStatus[] = [
-  'AWAITING_PHOTOS', 'READY_FOR_SUBMISSION', 'ADDITIONAL_INFO_REQUESTED', 'REJECTED',
+  'NEW', 'PARSING', 'PARSED', 'READY_FOR_SUBMISSION', 'REJECTED',
+  // TODO: Add 'ADDITIONAL_INFO_REQUESTED' once DOB response tracking is implemented
 ];
 const IN_PROGRESS_STATUSES: ViolationStatus[] = [
-  'ASSIGNED', 'IN_PROGRESS', 'PHOTOS_UPLOADED', 'SUBMITTED',
+  'ASSIGNED', 'IN_PROGRESS', 'AWAITING_PHOTOS', 'PHOTOS_UPLOADED', 'SUBMITTED',
 ];
 const INACTIVE_STATUSES: ViolationStatus[] = [
-  'NEW', 'PARSING', 'PARSED', 'APPROVED', 'CLOSED',
+  'APPROVED', 'CLOSED',
 ];
 
 function getActionLabel(status: ViolationStatus): string {
   switch (status) {
-    case 'AWAITING_PHOTOS': return 'Upload photos';
+    case 'NEW': return 'Review & assign';
+    case 'PARSING': return 'Processing upload...';
+    case 'PARSED': return 'Review parsed data';
     case 'READY_FOR_SUBMISSION': return 'Review & submit to DOB';
-    case 'ADDITIONAL_INFO_REQUESTED': return 'Respond to DOB request';
+    // TODO: case 'ADDITIONAL_INFO_REQUESTED': return 'Respond to DOB request';
     case 'REJECTED': return 'Fix & resubmit';
     default: return '';
   }

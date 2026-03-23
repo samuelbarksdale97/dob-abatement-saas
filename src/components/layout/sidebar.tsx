@@ -19,7 +19,7 @@ import { useRouter } from 'next/navigation';
 
 const navItems = [
   { href: '/dashboard', label: 'Portfolio Home', icon: LayoutDashboard },
-  { href: '/violations', label: 'All Violations', icon: Table },
+  { href: '/violations', label: 'All Infractions', icon: Table },
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/parse', label: 'Parse NOI', icon: FileUp },
