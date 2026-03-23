@@ -209,7 +209,14 @@ async function renderItemPage(
     doc.text('Location: ', MARGIN, y);
     const locLabelW = doc.getTextWidth('Location: ');
     doc.setFont('helvetica', 'normal');
-    doc.text(item.specific_location, MARGIN + locLabelW, y);
+    const locLines = doc.splitTextToSize(item.specific_location, CONTENT_WIDTH - locLabelW);
+    doc.text(locLines[0] || '', MARGIN + locLabelW, y);
+    if (locLines.length > 1) {
+      for (let i = 1; i < locLines.length; i++) {
+        y += 12;
+        doc.text(locLines[i], MARGIN, y);
+      }
+    }
     y += 14;
   }
 
@@ -220,12 +227,13 @@ async function renderItemPage(
     doc.setFont('helvetica', 'normal');
     doc.text(item.date_of_infraction, MARGIN + dateLabelW, y);
     if (item.time_of_infraction) {
-      const timeLabel = '    Time of Infraction: ';
       const dateEndX = MARGIN + dateLabelW + doc.getTextWidth(item.date_of_infraction);
+      const gap = 20; // Fixed gap between date value and time label
       doc.setFont('helvetica', 'bold');
-      doc.text(timeLabel, dateEndX, y);
+      const timeLabel = 'Time of Infraction: ';
+      doc.text(timeLabel, dateEndX + gap, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(item.time_of_infraction, dateEndX + doc.getTextWidth(timeLabel), y);
+      doc.text(item.time_of_infraction, dateEndX + gap + doc.getTextWidth(timeLabel), y);
     }
     y += 14;
   }
@@ -240,14 +248,29 @@ async function renderItemPage(
   const tableWidth = CONTENT_WIDTH;
   const colWidth = tableWidth / 2;
 
-  // Explanation row
+  // Explanation row (wraps to multiple lines if needed)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setDrawColor(0);
   doc.setLineWidth(0.75);
-  doc.rect(tableX, y, tableWidth, 18);
-  doc.text(`Explanation: ${explanationText}`, tableX + 5, y + 13);
-  y += 18;
+
+  const explLabel = 'Explanation: ';
+  const explLabelW = doc.getTextWidth(explLabel);
+  doc.setFont('helvetica', 'normal');
+  const explLines = doc.splitTextToSize(explanationText, tableWidth - 10);
+  // First line shares row with the label
+  const explRowH = Math.max(18, 13 + explLines.length * 12 + 3);
+  doc.rect(tableX, y, tableWidth, explRowH);
+  doc.setFont('helvetica', 'bold');
+  doc.text(explLabel, tableX + 5, y + 13);
+  doc.setFont('helvetica', 'normal');
+  doc.text(explLines[0] || '', tableX + 5 + explLabelW, y + 13);
+  if (explLines.length > 1) {
+    for (let i = 1; i < explLines.length; i++) {
+      doc.text(explLines[i], tableX + 5, y + 13 + i * 12);
+    }
+  }
+  y += explRowH;
 
   // Photo headers row
   const headerRowH = 16;
