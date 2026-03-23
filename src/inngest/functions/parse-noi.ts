@@ -172,7 +172,20 @@ export const parseNOI = inngest.createFunction(
       const { notice_level_data, work_orders } = aiResult;
 
       const parseFine = (fineStr: string): number | null => {
-        const cleaned = fineStr.replace(/[$,]/g, '');
+        if (!fineStr) return null;
+        // Strip dollar sign and whitespace
+        let cleaned = fineStr.replace(/[$\s]/g, '');
+        // Handle ambiguous last separator: if the last comma or period has exactly
+        // 2 digits after it, treat it as the decimal point. This handles Gemini
+        // returning "2,358,00" (comma instead of period) or EU-style formatting.
+        const lastSep = cleaned.search(/[.,]\d{2}$/);
+        if (lastSep !== -1) {
+          const before = cleaned.slice(0, lastSep).replace(/[.,]/g, '');
+          const after = cleaned.slice(lastSep + 1);
+          cleaned = `${before}.${after}`;
+        } else {
+          cleaned = cleaned.replace(/[,]/g, '');
+        }
         const num = parseFloat(cleaned);
         return isNaN(num) ? null : num;
       };
