@@ -153,7 +153,7 @@ export function PhotoUploadSlot({
         setPreview(data.signed_url);
       }
 
-      toast.success(`${photoType === 'BEFORE' ? 'Before' : 'After'} photo uploaded successfully`);
+      toast.success(`${photoType === 'BEFORE' ? 'Before' : 'Repair'} photo uploaded successfully`);
       onUploadComplete({
         id: data.photo?.id || crypto.randomUUID(),
         violation_item_id: violationItemId,
@@ -189,7 +189,6 @@ export function PhotoUploadSlot({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading || verifying}
@@ -252,7 +251,7 @@ export function PhotoUploadSlot({
           </div>
           <div className="flex flex-col items-center gap-1">
              <span className="text-sm font-bold text-slate-700">
-               Upload {photoType === 'BEFORE' ? 'Before' : 'After'} Photo
+               Upload {photoType === 'BEFORE' ? 'Before' : 'Repair'} Photo
              </span>
              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tap to capture or select</span>
           </div>
