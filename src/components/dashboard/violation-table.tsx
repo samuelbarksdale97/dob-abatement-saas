@@ -11,9 +11,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowUpDown, Coins } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import type { Violation, SortField, SortDirection } from '@/lib/types';
-import type { ParseCosts } from '@/lib/ai/schemas';
 import {
   STATUS_LABELS,
   STATUS_COLORS,
@@ -71,13 +70,12 @@ export function ViolationTable({
             <SortableHeader field="abatement_deadline">Deadline</SortableHeader>
             <TableHead className="font-semibold text-slate-700">Status</TableHead>
             <TableHead className="font-semibold text-slate-700">Items</TableHead>
-            <TableHead className="font-semibold text-slate-700">AI Cost</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {violations.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-20 text-center text-slate-500 font-medium">
+              <TableCell colSpan={7} className="py-20 text-center text-slate-500 font-medium">
                 No violations found. Upload an NOI PDF or import from CSV to get started.
               </TableCell>
             </TableRow>
@@ -121,19 +119,6 @@ export function ViolationTable({
                   </TableCell>
                   <TableCell className="py-4 text-sm font-semibold text-slate-500">
                     {(v.violation_items as unknown as { count: number }[])?.[0]?.count ?? 0}
-                  </TableCell>
-                  <TableCell className="py-4 text-sm font-medium">
-                    {(() => {
-                      const costs = (v.parse_metadata as Record<string, unknown>)?.costs as ParseCosts | undefined;
-                      const total = costs?.total_usd ?? (
-                        (costs?.ai_parse?.cost_usd ?? 0) + (costs?.analyze_pages?.cost_usd ?? 0)
-                      );
-                      return total > 0 ? (
-                        <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-1 rounded-md w-fit">
-                          <Coins className="h-3.5 w-3.5" />${total.toFixed(4)}
-                        </span>
-                      ) : '—';
-                    })()}
                   </TableCell>
                 </TableRow>
               );

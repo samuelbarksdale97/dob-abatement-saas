@@ -273,7 +273,7 @@ export default function ViolationDetailPage() {
 
   return (
     <div>
-      <Nav title={`Violation ${violation.notice_id || 'Detail'}`} />
+      <Nav title={`Infraction ${violation.notice_id || 'Detail'}`} />
       <div className="p-6">
         {/* Back button + header */}
         <div className="mb-8">
