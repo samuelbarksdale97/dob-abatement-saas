@@ -344,7 +344,14 @@ export const parseNOI = inngest.createFunction(
           .from('properties')
           .insert({
             org_id: orgId,
-            address: rawAddress.replace(/,?\s*unit[:\s]+\S+/i, '').replace(/,?\s*#\S+/, '').trim(),
+            address: rawAddress
+              .replace(/,?\s*unit[:\s]+\S+/i, '')
+              .replace(/,?\s*apt[.:\s]+\S+/i, '')
+              .replace(/,?\s*#\S+/, '')
+              .replace(/,?\s*washington\s*,?\s*d\.?c\.?\s*\d{5}(-\d{4})?/i, '')
+              .replace(/,?\s*washington\s*,?\s*d\.?c\.?/i, '')
+              .replace(/\s+\d{5}(-\d{4})?\s*$/, '')
+              .trim(),
             city: '',
             state: 'DC',
           })
