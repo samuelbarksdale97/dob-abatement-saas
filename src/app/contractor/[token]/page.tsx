@@ -345,16 +345,7 @@ export default function ContractorViewPage() {
                               Original Infraction (Before)
                             </p>
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                              {inspectorSignedUrl ? (
-                                // Pre-rendered PNG image (new flow)
-                                <img
-                                  src={inspectorSignedUrl}
-                                  alt={description || `Inspector photo page ${inspectorPhoto.page_number}`}
-                                  className="w-full h-auto"
-                                  loading="lazy"
-                                />
-                              ) : pdf_url && inspectorPhoto.page_number ? (
-                                // Legacy: render PDF page client-side
+                              {pdf_url && inspectorPhoto.page_number ? (
                                 <EvidencePhoto
                                   pdfUrl={pdf_url}
                                   pageNumber={inspectorPhoto.page_number}

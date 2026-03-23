@@ -31,7 +31,6 @@ const VISIBLE_STEPS: ParseStepName[] = [
   'insert_records',
   'analyze_pages',
   'match_photos',
-  'render_images',
   'complete',
 ];
 
@@ -42,7 +41,6 @@ const STEP_CONFIG: Record<string, { label: string; icon: React.ElementType; desc
   insert_records: { label: 'Saving Data',     icon: Database,    description: 'Writing parsed violations to the database' },
   analyze_pages:  { label: 'Page Analysis',   icon: ScanSearch,  description: 'Identifying evidence photos on each page' },
   match_photos:   { label: 'Photo Matching',  icon: ImageIcon,   description: 'Linking evidence photos to violation items' },
-  render_images:  { label: 'Rendering Photos', icon: ImageIcon,   description: 'Converting inspector evidence pages into high-resolution images for verification and DOB resubmission' },
   complete:       { label: 'Complete',         icon: PartyPopper, description: 'Finalizing and verifying all data' },
 };
 

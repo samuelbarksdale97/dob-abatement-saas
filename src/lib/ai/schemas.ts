@@ -44,7 +44,6 @@ export type ParseStepName =
   | 'insert_records'
   | 'analyze_pages'
   | 'match_photos'
-  | 'render_images'
   | 'complete';
 
 export interface ParseStepStatus {
