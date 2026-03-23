@@ -367,10 +367,10 @@ export default function ContractorViewPage() {
                               )}
                             </div>
                           </div>
-                          {/* Right: After (Upload) */}
+                          {/* Right: Repair photo (Upload) */}
                           <div className="flex flex-col">
                             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center justify-between">
-                              <span>Completed Repair (After) <span className="text-red-500">*</span></span>
+                              <span>Upload Repair Photo <span className="text-red-500">*</span></span>
                             </p>
                             <div className="flex-1">
                                <PhotoUploadSlot
