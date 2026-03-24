@@ -256,7 +256,7 @@ async function renderItemPage(
   const explLabel = 'Explanation: ';
   const explLabelW = doc.getTextWidth(explLabel);
   doc.setFont('helvetica', 'normal');
-  const explLines = doc.splitTextToSize(explanationText, tableWidth - 10);
+  const explLines = doc.splitTextToSize(explanationText, tableWidth - 10 - explLabelW);
   // First line shares row with the label
   const explRowH = Math.max(18, 13 + explLines.length * 12 + 3);
   doc.rect(tableX, y, tableWidth, explRowH);

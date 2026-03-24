@@ -128,6 +128,15 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    // 6b. Upsert contact (keeps contacts table in sync with contractors)
+    await adminClient.from('contacts').upsert({
+      org_id: profile.org_id,
+      full_name: contractor_name,
+      email: contractor_email,
+      phone: contractor_phone || null,
+      category: 'CONTRACTOR',
+    }, { onConflict: 'org_id,email' });
+
     // 7. Create work order
     const { data: workOrder, error: workOrderError } = await adminClient
       .from('work_orders')

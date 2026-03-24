@@ -69,10 +69,12 @@ export default function AnalyticsPage() {
 
     try {
       const res = await fetch(`/api/analytics?${params}`);
+      if (!res.ok) throw new Error(`Analytics fetch failed: ${res.status}`);
       const result = await res.json();
       setData(result);
-    } catch {
-      // silent fail
+    } catch (err) {
+      console.error('Analytics fetch error:', err);
+      setData(null);
     }
     setLoading(false);
   }, [propertyId, dateFrom, dateTo]);
@@ -88,7 +90,7 @@ export default function AnalyticsPage() {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const statusPieData = data
+  const statusPieData = data?.status_distribution
     ? Object.entries(data.status_distribution).map(([status, count]) => ({
         name: STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status,
         value: count,
@@ -164,7 +166,7 @@ export default function AnalyticsPage() {
                 <CardContent className="p-4">
                   <p className="text-xs text-gray-500">Open / Closed</p>
                   <p className="text-2xl font-bold">
-                    {data.opened_vs_closed.reduce((s, w) => s + w.opened, 0)} / {data.opened_vs_closed.reduce((s, w) => s + w.closed, 0)}
+                    {(data.opened_vs_closed ?? []).reduce((s, w) => s + w.opened, 0)} / {(data.opened_vs_closed ?? []).reduce((s, w) => s + w.closed, 0)}
                   </p>
                 </CardContent>
               </Card>
@@ -178,7 +180,7 @@ export default function AnalyticsPage() {
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={data.opened_vs_closed}>
+                    <LineChart data={data.opened_vs_closed ?? []}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="week" tick={{ fontSize: 11 }} tickFormatter={w => {
                         const d = new Date(w);
@@ -199,26 +201,30 @@ export default function AnalyticsPage() {
                   <CardTitle className="text-sm">Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={statusPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {statusPieData.map((entry, i) => (
-                          <Cell key={entry.name} fill={entry.fill || PIE_COLORS[i % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {statusPieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <PieChart>
+                        <Pie
+                          data={statusPieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                          labelLine={false}
+                        >
+                          {statusPieData.map((entry, i) => (
+                            <Cell key={entry.name} fill={entry.fill || PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="py-12 text-center text-sm text-gray-400">No status data</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
