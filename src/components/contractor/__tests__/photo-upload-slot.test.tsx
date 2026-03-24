@@ -142,6 +142,44 @@ describe('PhotoUploadSlot', () => {
     });
   });
 
+  it('accepts a file via drag and drop', async () => {
+    const mockResponse = {
+      photo: { id: 'photo-drop' },
+      signed_url: 'https://example.com/dropped.jpg',
+    };
+
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    // jsdom doesn't implement createObjectURL
+    const mockObjectUrl = 'blob:mock-drop-url';
+    global.URL.createObjectURL = vi.fn(() => mockObjectUrl);
+    global.URL.revokeObjectURL = vi.fn();
+
+    render(<PhotoUploadSlot {...defaultProps} />);
+
+    const button = screen.getByRole('button');
+    const file = new File(['photo'], 'dropped.jpg', { type: 'image/jpeg' });
+
+    fireEvent.drop(button, {
+      dataTransfer: { files: [file] },
+    });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/contractor/${defaultProps.token}/photos`,
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith('success', expect.any(String));
+      expect(mockOnUploadComplete).toHaveBeenCalled();
+    });
+  });
+
   it('handles upload errors gracefully', async () => {
     const user = userEvent.setup();
     (global.fetch as any).mockResolvedValueOnce({
