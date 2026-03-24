@@ -281,6 +281,46 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
       {/* Step Timeline */}
       <div className="relative">
+        {/* Synthetic "Preparing to process..." step */}
+        {(() => {
+          const aiParseStep = visibleSteps.find(s => s.step === 'ai_parse');
+          const allPending = visibleSteps.every(s => s.status === 'pending');
+          const preparingStatus =
+            isFailed || isComplete ? null :
+            allPending ? 'running' :
+            (aiParseStep?.status === 'pending') ? 'running' :
+            'completed';
+
+          if (!preparingStatus) return null;
+
+          return (
+            <div className="relative flex gap-5 pb-8">
+              {/* Vertical connecting line to first real step */}
+              <div className={`absolute left-[19px] top-[38px] h-[calc(100%-24px)] w-[3px] rounded-full transition-colors duration-500 ${
+                preparingStatus === 'completed' ? 'bg-emerald-300' : 'bg-slate-200'
+              }`} />
+              <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 shadow-sm ${
+                preparingStatus === 'completed' ? 'border-emerald-500 bg-emerald-50' :
+                'animate-breathe border-blue-500 bg-blue-50/80 shadow-blue-100'
+              }`}>
+                {preparingStatus === 'completed'
+                  ? <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  : <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                }
+              </div>
+              <div className="flex-1 pt-1">
+                <p className={`text-base font-bold tracking-tight ${
+                  preparingStatus === 'completed' ? 'text-emerald-700' : 'text-blue-700'
+                }`}>
+                  Preparing to process...
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Queuing your PDF for AI analysis
+                </p>
+              </div>
+            </div>
+          );
+        })()}
         {visibleSteps.map((step, index) => {
           const config = STEP_CONFIG[step.step];
           const isLast = index === visibleSteps.length - 1;
