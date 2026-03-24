@@ -155,7 +155,7 @@ export async function POST(
             .from('violations')
             .update({ status: 'READY_FOR_SUBMISSION' })
             .eq('id', workOrder.violation_id)
-            .in('status', ['PHOTOS_UPLOADED', 'AWAITING_PHOTOS', 'IN_PROGRESS']);
+            .eq('status', 'PHOTOS_UPLOADED');
         }
       }
     }

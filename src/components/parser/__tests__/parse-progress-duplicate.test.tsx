@@ -178,6 +178,89 @@ describe('ParseProgress — Duplicate Detection UI', () => {
     expect(screen.queryByText('Duplicate NOI Detected')).not.toBeInTheDocument();
   });
 
+  describe('"Preparing to process..." synthetic step', () => {
+    it('shows the step as running when all real steps are pending', async () => {
+      const allPendingMetadata = {
+        steps: [
+          { step: 'ai_parse', status: 'pending' },
+          { step: 'insert_records', status: 'pending' },
+          { step: 'analyze_pages', status: 'pending' },
+          { step: 'match_photos', status: 'pending' },
+          { step: 'complete', status: 'pending' },
+        ],
+      };
+      setupMockQuery('processing', allPendingMetadata);
+
+      render(<ParseProgress violationId="v-456" onComplete={onComplete} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Preparing to process...')).toBeInTheDocument();
+      });
+    });
+
+    it('shows the step as completed once ai_parse is running', async () => {
+      const aiParseRunningMetadata = {
+        steps: [
+          { step: 'ai_parse', status: 'running' },
+          { step: 'insert_records', status: 'pending' },
+          { step: 'analyze_pages', status: 'pending' },
+          { step: 'match_photos', status: 'pending' },
+          { step: 'complete', status: 'pending' },
+        ],
+      };
+      setupMockQuery('processing', aiParseRunningMetadata);
+
+      render(<ParseProgress violationId="v-456" onComplete={onComplete} />);
+
+      // Step still renders (as completed), so text is visible
+      await waitFor(() => {
+        expect(screen.getByText('Preparing to process...')).toBeInTheDocument();
+      });
+    });
+
+    it('hides the step when parse is complete', async () => {
+      const completedMetadata = {
+        steps: [
+          { step: 'ai_parse', status: 'completed' },
+          { step: 'insert_records', status: 'completed' },
+          { step: 'analyze_pages', status: 'completed' },
+          { step: 'match_photos', status: 'completed' },
+          { step: 'complete', status: 'completed' },
+        ],
+      };
+      setupMockQuery('completed', completedMetadata);
+
+      render(<ParseProgress violationId="v-456" onComplete={onComplete} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Parse Complete!')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Preparing to process...')).not.toBeInTheDocument();
+    });
+
+    it('hides the step when parse has failed', async () => {
+      const failedMetadata = {
+        steps: [
+          { step: 'ai_parse', status: 'failed', message: 'AI error' },
+          { step: 'insert_records', status: 'pending' },
+          { step: 'analyze_pages', status: 'pending' },
+          { step: 'match_photos', status: 'pending' },
+          { step: 'complete', status: 'pending' },
+        ],
+      };
+      setupMockQuery('failed', failedMetadata);
+
+      render(<ParseProgress violationId="v-456" onComplete={onComplete} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Parse Failed')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Preparing to process...')).not.toBeInTheDocument();
+    });
+  });
+
   it('does NOT show duplicate prompt for completed state', async () => {
     const completedMetadata = {
       steps: [

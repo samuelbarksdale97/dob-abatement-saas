@@ -47,6 +47,7 @@ export function PhotoUploadSlot({
   const [preview, setPreview] = useState<string | null>(existingPhoto?.signed_url || null);
   const [verifying, setVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
@@ -106,10 +107,7 @@ export function PhotoUploadSlot({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     // Validate file
     const error = validateFile(file);
     if (error) {
@@ -181,6 +179,20 @@ export function PhotoUploadSlot({
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (uploading) return;
+    const file = e.dataTransfer.files[0];
+    if (file) await processFile(file);
+  };
+
   const isVerified = verificationResult?.isMatch && verificationResult.confidence >= 80;
 
   return (
@@ -243,8 +255,15 @@ export function PhotoUploadSlot({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
           disabled={uploading}
-          className="group flex h-56 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/80 hover:border-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          className={`group flex h-56 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            isDragOver
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-slate-300 bg-slate-50/50 hover:bg-slate-100/80 hover:border-slate-400'
+          }`}
         >
           <div className="bg-white p-3 rounded-full shadow-sm group-hover:scale-110 transition-transform duration-300">
              <Camera className="h-6 w-6 text-slate-400 shrink-0 group-hover:text-slate-600 transition-colors" />
@@ -253,7 +272,7 @@ export function PhotoUploadSlot({
              <span className="text-sm font-bold text-slate-700">
                Upload {photoType === 'BEFORE' ? 'Before' : 'Repair'} Photo
              </span>
-             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tap to capture or select</span>
+             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tap, drag, or drop a photo here</span>
           </div>
         </button>
       )}
