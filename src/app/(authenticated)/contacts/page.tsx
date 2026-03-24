@@ -6,11 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { AddContactDialog } from '@/components/contacts/add-contact-dialog';
+import { EditContactDialog } from '@/components/contacts/edit-contact-dialog';
 import type { Contact, ContactCategory } from '@/lib/types';
 import { CONTACT_CATEGORY_COLORS, CONTACT_CATEGORY_LABELS } from '@/lib/types';
+import { toast } from 'sonner';
 
 const CATEGORIES: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'All' },
@@ -29,6 +31,23 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async (contact: Contact) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${contact.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      toast.success(`${contact.full_name} deactivated`);
+      setDeleteTarget(null);
+      fetchContacts();
+    } catch {
+      toast.error('Failed to delete contact');
+    }
+    setDeleting(false);
+  };
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -141,9 +160,10 @@ export default function ContactsPage() {
         ) : (
           <div className="space-y-2">
             {contacts.map((contact) => (
-              <Link key={contact.id} href={`/contacts/${contact.id}`}>
-                <Card className="transition-all hover:shadow-md">
-                  <CardContent className="flex items-center gap-4 p-4">
+              <Card key={contact.id} className="transition-all hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-4">
+                  {/* Clickable area → detail page */}
+                  <Link href={`/contacts/${contact.id}`} className="flex min-w-0 flex-1 items-center gap-4">
                     {/* Avatar */}
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
                       {contact.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -174,9 +194,27 @@ export default function ContactsPage() {
                     <div className="shrink-0 text-right text-xs text-gray-400">
                       {formatLastTouch(contact.last_interaction_at)}
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </Link>
+
+                  {/* Action icons */}
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={(e) => { e.preventDefault(); setEditContact(contact); }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      title="Edit contact"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.preventDefault(); setDeleteTarget(contact); }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Delete contact"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
@@ -188,6 +226,32 @@ export default function ContactsPage() {
         onSuccess={fetchContacts}
         defaultCategory={category !== 'all' ? category as ContactCategory : undefined}
       />
+
+      {editContact && (
+        <EditContactDialog
+          open={!!editContact}
+          onOpenChange={(open) => { if (!open) setEditContact(null); }}
+          contact={editContact}
+          onSuccess={() => { setEditContact(null); fetchContacts(); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete {deleteTarget.full_name}?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will deactivate the contact. They won&apos;t appear in searches or the contractor dropdown.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={() => handleDelete(deleteTarget)} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete Contact'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
