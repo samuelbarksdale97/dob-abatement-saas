@@ -10,12 +10,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch contractors for the user's org, ordered by most recently assigned
-    const { data: contractors, error } = await supabase
-      .from('contractors')
-      .select('*')
+    // Fetch contractors from the unified contacts table (category = CONTRACTOR)
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select('id, full_name, email, phone, total_interactions, last_interaction_at')
+      .eq('category', 'CONTRACTOR')
       .eq('active', true)
-      .order('last_assigned_at', { ascending: false, nullsFirst: false })
+      .order('last_interaction_at', { ascending: false, nullsFirst: false })
       .limit(50);
 
     if (error) {
@@ -25,7 +26,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ contractors: contractors || [] });
+    // Map contacts shape to the contractor shape expected by the assign-work-order dialog
+    const contractors = (contacts || []).map((c) => ({
+      id: c.id,
+      name: c.full_name,
+      email: c.email,
+      phone: c.phone,
+      total_assignments: c.total_interactions,
+      last_assigned_at: c.last_interaction_at,
+    }));
+
+    return NextResponse.json({ contractors });
   } catch (error) {
     console.error('Contractors fetch error:', error);
     return NextResponse.json(

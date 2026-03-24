@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Nav } from '@/components/layout/nav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronRight, Mail, Phone, Building2, MessageSquare, Zap, PhoneCall, Calendar } from 'lucide-react';
+import { ChevronRight, Mail, Phone, Building2, MessageSquare, Zap, PhoneCall, Calendar, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { AddInteractionDialog } from '@/components/contacts/add-interaction-dialog';
+import { EditContactDialog } from '@/components/contacts/edit-contact-dialog';
 import type { Contact, ContactInteraction, ContactEntityLink, InteractionType } from '@/lib/types';
 import { CONTACT_CATEGORY_COLORS, CONTACT_CATEGORY_LABELS } from '@/lib/types';
+import { toast } from 'sonner';
 
 const INTERACTION_ICONS: Record<InteractionType, typeof MessageSquare> = {
   NOTE: MessageSquare,
@@ -31,6 +33,7 @@ const INTERACTION_LABELS: Record<InteractionType, string> = {
 
 export default function ContactDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const contactId = params.id as string;
 
   const [contact, setContact] = useState<Contact | null>(null);
@@ -38,6 +41,9 @@ export default function ContactDetailPage() {
   const [entityLinks, setEntityLinks] = useState<ContactEntityLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [addInteractionOpen, setAddInteractionOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -69,6 +75,20 @@ export default function ContactDetailPage() {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete contact');
+      toast.success('Contact deactivated');
+      router.push('/contacts');
+    } catch {
+      toast.error('Failed to delete contact');
+      setDeleting(false);
+      setDeleteConfirm(false);
+    }
   };
 
   if (loading) {
@@ -148,9 +168,19 @@ export default function ContactDetailPage() {
                   )}
                 </div>
               </div>
-              <Button size="sm" onClick={() => setAddInteractionOpen(true)}>
-                Log Interaction
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setDeleteConfirm(true)} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete
+                </Button>
+                <Button size="sm" onClick={() => setAddInteractionOpen(true)}>
+                  Log Interaction
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -237,6 +267,32 @@ export default function ContactDetailPage() {
         contactId={contactId}
         onSuccess={fetchDetail}
       />
+
+      {editOpen && (
+        <EditContactDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          contact={contact}
+          onSuccess={(updated) => setContact(updated)}
+        />
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete {contact.full_name}?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will deactivate the contact. They won&apos;t appear in searches or the contractor dropdown.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(false)} className="rounded-lg">Cancel</Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="rounded-lg">
+                {deleting ? 'Deleting...' : 'Delete Contact'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
