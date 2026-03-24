@@ -78,6 +78,12 @@ describe('POST /api/work-orders', () => {
       error: null,
     }));
 
+    // 4b. Contacts upsert (sync new contractor to contacts table)
+    mockFrom.mockReturnValueOnce(chainMock({
+      data: null,
+      error: null,
+    }));
+
     // 5. Work order insert
     mockFrom.mockReturnValueOnce(chainMock({
       data: mockWorkOrder(),

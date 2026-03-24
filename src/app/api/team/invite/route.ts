@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send invitation email
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dob-abatement-saas.vercel.app';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yoke.nexark.ai';
     const signupUrl = `${appUrl}/signup?token=${invitation.token}&org_id=${orgId}&role=${inviteRole || 'PROJECT_MANAGER'}`;
 
     // Get org name

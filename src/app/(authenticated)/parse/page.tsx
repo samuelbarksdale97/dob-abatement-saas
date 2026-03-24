@@ -44,7 +44,10 @@ export default function ParsePage() {
         )}
 
         {state === 'results' && violationId && (
-          <ParsedResults violationId={violationId} />
+          <ParsedResults
+            violationId={violationId}
+            onParseAnother={() => { setState('upload'); setViolationId(null); }}
+          />
         )}
       </div>
     </div>

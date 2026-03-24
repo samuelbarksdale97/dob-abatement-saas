@@ -445,7 +445,7 @@ export default function UnitDetailPage() {
             }
 
             return (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
                 {tabViolations.map((v) => (
                   <ViolationCard
                     key={v.id}
