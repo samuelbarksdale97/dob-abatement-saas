@@ -132,6 +132,7 @@ export const parseNOI = inngest.createFunction(
               ...((await supabase.from('violations').select('parse_metadata').eq('id', violationId).single()).data?.parse_metadata as Record<string, unknown> || {}),
               duplicate_detected: true,
               duplicate_violation_id: existing.id,
+              existing_notice_id: noticeId,
             },
           })
           .eq('id', violationId);
@@ -142,24 +143,73 @@ export const parseNOI = inngest.createFunction(
       return { isDuplicate: false, existingViolationId: null };
     });
 
-    // If duplicate detected, mark as duplicate and halt pipeline
+    // If duplicate detected, pause and wait for user decision
     if (duplicateInfo.isDuplicate) {
-      await step.run('halt-duplicate', async () => {
+      await step.run('pause-duplicate', async () => {
         await supabase
           .from('violations')
           .update({
-            status: 'CLOSED',
-            parse_status: 'duplicate',
-            notes: `Duplicate of existing violation ${duplicateInfo.existingViolationId}. Pipeline halted.`,
+            parse_status: 'duplicate_pending',
           })
           .eq('id', violationId);
 
-        log.info('halt_duplicate', 'Pipeline halted — duplicate NOI', {
+        log.info('pause_duplicate', 'Waiting for user decision — duplicate NOI', {
           existing_violation_id: duplicateInfo.existingViolationId,
         });
       });
 
-      return { success: false, violationId, isDuplicate: true };
+      // Wait up to 5 minutes for the user to decide
+      const decision = await step.waitForEvent('wait-for-duplicate-decision', {
+        event: 'noi/duplicate.resolved',
+        match: 'data.violationId',
+        timeout: '5m',
+      });
+
+      if (!decision || decision.data.action !== 'overwrite') {
+        // User chose to cancel or timed out
+        await step.run('halt-duplicate', async () => {
+          await supabase
+            .from('violations')
+            .update({
+              status: 'CLOSED',
+              parse_status: 'duplicate',
+              notes: `Duplicate of existing violation ${duplicateInfo.existingViolationId}. Cancelled by user.`,
+            })
+            .eq('id', violationId);
+
+          log.info('halt_duplicate', 'Pipeline halted — user cancelled duplicate', {
+            existing_violation_id: duplicateInfo.existingViolationId,
+          });
+        });
+
+        return { success: false, violationId, isDuplicate: true };
+      }
+
+      // User chose to overwrite — delete the old violation and continue
+      await step.run('overwrite-duplicate', async () => {
+        const oldId = duplicateInfo.existingViolationId!;
+
+        // Delete related records in dependency order
+        await supabase.from('photos').delete().eq('violation_id', oldId);
+        await supabase.from('violation_items').delete().eq('violation_id', oldId);
+        await supabase.from('contractor_tokens').delete().eq('violation_id', oldId);
+        await supabase.from('work_orders').delete().eq('violation_id', oldId);
+        await supabase.from('audit_log').delete().eq('violation_id', oldId);
+        await supabase.from('violations').delete().eq('id', oldId);
+
+        // Reset current violation to continue pipeline
+        await supabase
+          .from('violations')
+          .update({
+            parse_status: 'processing',
+            status: 'PARSING',
+          })
+          .eq('id', violationId);
+
+        log.info('overwrite_duplicate', 'Old violation deleted, continuing pipeline', {
+          deleted_violation_id: oldId,
+        });
+      });
     }
 
     // ================================================================

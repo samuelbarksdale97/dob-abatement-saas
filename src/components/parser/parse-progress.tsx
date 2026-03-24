@@ -18,7 +18,11 @@ import {
   PartyPopper,
   AlertTriangle,
   DollarSign,
+  Copy,
+  RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import type { ParseMetadata, ParseStepStatus, ParseStepName } from '@/lib/ai/schemas';
 
 interface ParseProgressProps {
@@ -56,6 +60,7 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
   const [startTime] = useState<number>(Date.now());
   const [elapsed, setElapsed] = useState<number>(0);
   const completionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [duplicateResolving, setDuplicateResolving] = useState(false);
 
   // Stable completion handler with delay so user sees the final state
   const handleComplete = useCallback(() => {
@@ -72,7 +77,7 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
   // Elapsed time ticker — runs while pending or processing
   useEffect(() => {
-    if (parseStatus === 'completed' || parseStatus === 'failed') return;
+    if (parseStatus === 'completed' || parseStatus === 'failed' || parseStatus === 'duplicate') return;
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
@@ -128,7 +133,7 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
   // Polling fallback — ensures progress updates even if Realtime isn't enabled
   useEffect(() => {
-    if (parseStatus === 'completed' || parseStatus === 'failed') return;
+    if (parseStatus === 'completed' || parseStatus === 'failed' || parseStatus === 'duplicate') return;
 
     const supabase = createClient();
     const poll = async () => {
@@ -151,6 +156,33 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
     return () => clearInterval(interval);
   }, [violationId, parseStatus, handleComplete]);
 
+  const isDuplicatePending = parseStatus === 'duplicate_pending';
+  const duplicateViolationId = metadata?.duplicate_violation_id as string | undefined;
+  const existingNoticeId = metadata?.existing_notice_id as string | undefined;
+
+  const handleDuplicateDecision = async (action: 'overwrite' | 'cancel') => {
+    setDuplicateResolving(true);
+    try {
+      const res = await fetch('/api/parse/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ violationId, action }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to resolve duplicate');
+      } else if (action === 'cancel') {
+        toast.info('Upload cancelled');
+        onComplete();
+      }
+      // If overwrite, the pipeline will resume and the polling will pick up the status change
+    } catch {
+      toast.error('Failed to resolve duplicate');
+    } finally {
+      setDuplicateResolving(false);
+    }
+  };
+
   const steps = metadata?.steps || [];
 
   // Compute overall progress
@@ -168,6 +200,53 @@ export function ParseProgress({ violationId, onComplete }: ParseProgressProps) {
 
   const isFailed = parseStatus === 'failed';
   const isComplete = parseStatus === 'completed';
+
+  // Duplicate pending — show prompt instead of normal progress
+  if (isDuplicatePending) {
+    return (
+      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-6 sm:p-10 shadow-sm">
+        <div className="flex flex-col items-center text-center gap-6">
+          <div className="bg-amber-100 p-4 rounded-full">
+            <Copy className="h-10 w-10 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black tracking-tight text-slate-900 mb-2">
+              Duplicate NOI Detected
+            </h3>
+            <p className="text-sm font-medium text-slate-600 max-w-md mx-auto">
+              This Notice of Infraction{existingNoticeId ? ` (${existingNoticeId})` : ''} has already been uploaded and processed.
+              Would you like to overwrite the existing data with this new upload?
+            </p>
+          </div>
+          <div className="flex gap-3 w-full max-w-sm">
+            <Button
+              variant="outline"
+              className="flex-1 h-12 font-bold"
+              onClick={() => handleDuplicateDecision('cancel')}
+              disabled={duplicateResolving}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 h-12 font-bold bg-amber-600 hover:bg-amber-700"
+              onClick={() => handleDuplicateDecision('overwrite')}
+              disabled={duplicateResolving}
+            >
+              {duplicateResolving ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Overwrite
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400 max-w-sm">
+            Overwriting will permanently delete the existing violation data and replace it with this upload.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-sm transition-colors ${
