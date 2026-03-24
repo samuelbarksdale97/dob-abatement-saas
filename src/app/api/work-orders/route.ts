@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 10. Construct magic link
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yoke.nexark.ai';
     const magicLink = `${appUrl}/contractor/${token}`;
 
     // 11. Send email notification

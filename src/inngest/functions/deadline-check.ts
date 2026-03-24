@@ -21,7 +21,7 @@ export const deadlineCheck = inngest.createFunction(
   { cron: '0 13 * * *' }, // 8 AM ET
   async ({ step }) => {
     const supabase = createAdminClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dob-abatement-saas.vercel.app';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yoke.nexark.ai';
 
     // Step 1: Find violations with approaching/overdue deadlines
     const violations = await step.run('find-deadline-violations', async () => {
