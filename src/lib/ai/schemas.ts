@@ -78,6 +78,9 @@ export interface ParseMetadata {
   gemini_meta?: Record<string, unknown>;
   gemini_page_meta?: Record<string, unknown>;
   costs?: ParseCosts;
+  duplicate_detected?: boolean;
+  duplicate_violation_id?: string;
+  existing_notice_id?: string;
   logs?: Array<{
     ts: string;
     level: string;
