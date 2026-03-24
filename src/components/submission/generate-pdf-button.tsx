@@ -41,7 +41,7 @@ export function GeneratePdfButton({ violation, items, photos, pdfUrl }: Generate
 
       const { data: org } = await supabase
         .from('organizations')
-        .select('name')
+        .select('name, settings')
         .eq('id', profile.org_id)
         .single();
 
@@ -178,7 +178,7 @@ export function GeneratePdfButton({ violation, items, photos, pdfUrl }: Generate
           : 'N/A',
         contactName: signer.full_name || 'Property Manager',
         contactCompany: org?.name || '',
-        contactEmail: signer.email || '',
+        contactEmail: (org?.settings as Record<string, unknown>)?.submission_contact_email as string || signer.email || '',
         contactPhone: signer.phone,
         items: pdfItems,
       });

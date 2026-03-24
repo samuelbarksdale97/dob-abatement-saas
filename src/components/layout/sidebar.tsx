@@ -9,7 +9,6 @@ import {
   LogOut,
   Settings,
   Users,
-  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -19,7 +18,6 @@ const navItems = [
   { href: '/dashboard', label: 'Portfolio Home', icon: LayoutDashboard },
   { href: '/violations', label: 'All Infractions', icon: Table },
   { href: '/contacts', label: 'Contacts', icon: Users },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/parse', label: 'Parse NOI', icon: FileUp },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
