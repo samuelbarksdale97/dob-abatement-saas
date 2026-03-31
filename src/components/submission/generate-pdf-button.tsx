@@ -12,7 +12,7 @@ import { SubmissionReviewDialog } from './submission-review-dialog';
 import type { Violation, ViolationItem, Photo } from '@/lib/types';
 
 /** Normalize "Unit:103" → "Unit: 103" for display */
-function normalizeUnitFormat(address: string): string {
+export function normalizeUnitFormat(address: string): string {
   return address.replace(/Unit:/gi, 'Unit: ').replace(/Unit:\s{2,}/gi, 'Unit: ');
 }
 
