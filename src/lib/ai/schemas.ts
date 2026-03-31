@@ -5,7 +5,7 @@ export const NOIParseResultSchema = z.object({
   notice_level_data: z.object({
     notice_id: z.string().describe('The NOI notice ID, e.g. "25NOIR-INS-07709"'),
     respondent: z.string().describe('The respondent/property owner name, e.g. "YOKE LEBAUM LLC"'),
-    infraction_address: z.string().describe('The full address including unit, e.g. "557 LEBAUM ST SE, Unit:103"'),
+    infraction_address: z.string().describe('The full address including unit, e.g. "557 LEBAUM ST SE, Unit: 103"'),
     date_of_service: z.string().describe('Date of service in MM/DD/YYYY format'),
     total_fines: z.string().describe('Total fine amount as string with dollar sign, e.g. "$4,499.00"'),
   }),
