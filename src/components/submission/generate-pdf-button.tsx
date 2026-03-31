@@ -7,8 +7,14 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { renderPdfPageToImage, fetchImageAsDataUrl } from '@/lib/pdf/prepare-images';
 import { generateSubmissionPdf } from '@/lib/pdf/generate-submission';
-import type { SubmissionPdfItem } from '@/lib/pdf/generate-submission';
+import type { SubmissionPdfData, SubmissionPdfItem } from '@/lib/pdf/generate-submission';
+import { SubmissionReviewDialog } from './submission-review-dialog';
 import type { Violation, ViolationItem, Photo } from '@/lib/types';
+
+/** Normalize "Unit:103" → "Unit: 103" for display */
+export function normalizeUnitFormat(address: string): string {
+  return address.replace(/Unit:/gi, 'Unit: ').replace(/Unit:\s{2,}/gi, 'Unit: ');
+}
 
 interface GeneratePdfButtonProps {
   violation: Violation;
@@ -18,11 +24,15 @@ interface GeneratePdfButtonProps {
 }
 
 export function GeneratePdfButton({ violation, items, photos, pdfUrl }: GeneratePdfButtonProps) {
+  const [preparing, setPreparing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState('');
+  const [reviewData, setReviewData] = useState<SubmissionPdfData | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
+  // Phase 1: Fetch data and open review dialog
+  const handlePrepare = async () => {
+    setPreparing(true);
     setProgress('Loading profile...');
 
     try {
@@ -167,10 +177,10 @@ export function GeneratePdfButton({ violation, items, photos, pdfUrl }: Generate
         }
       }
 
-      // 4. Generate PDF
-      setProgress('Generating PDF...');
-      const blob = await generateSubmissionPdf({
-        address: violation.infraction_address || 'Address not available',
+      // 4. Build review data and open dialog
+      const rawAddress = violation.infraction_address || 'Address not available';
+      const data: SubmissionPdfData = {
+        address: normalizeUnitFormat(rawAddress),
         respondent: violation.respondent || violation.infraction_address || 'Property Owner',
         noiNumber: violation.notice_id || 'N/A',
         noiDate: violation.date_of_service
@@ -181,9 +191,27 @@ export function GeneratePdfButton({ violation, items, photos, pdfUrl }: Generate
         contactEmail: (org?.settings as Record<string, unknown>)?.submission_contact_email as string || signer.email || '',
         contactPhone: signer.phone,
         items: pdfItems,
-      });
+      };
 
-      // 5. Trigger download
+      setReviewData(data);
+      setReviewOpen(true);
+    } catch (err) {
+      console.error('PDF preparation error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to prepare submission data');
+    } finally {
+      setPreparing(false);
+      setProgress('');
+    }
+  };
+
+  // Phase 2: Generate PDF from reviewed/edited data
+  const handleConfirmGenerate = async (editedData: SubmissionPdfData) => {
+    setGenerating(true);
+
+    try {
+      const blob = await generateSubmissionPdf(editedData);
+
+      // Trigger download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -194,33 +222,46 @@ export function GeneratePdfButton({ violation, items, photos, pdfUrl }: Generate
       URL.revokeObjectURL(url);
 
       toast.success('Submission PDF generated and downloaded');
+      setReviewOpen(false);
+      setReviewData(null);
     } catch (err) {
       console.error('PDF generation error:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to generate PDF');
     } finally {
       setGenerating(false);
-      setProgress('');
     }
   };
 
   return (
-    <Button
-      variant="default"
-      size="sm"
-      onClick={handleGenerate}
-      disabled={generating}
-    >
-      {generating ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {progress || 'Generating...'}
-        </>
-      ) : (
-        <>
-          <FileText className="mr-2 h-4 w-4" />
-          Generate Submission Report
-        </>
+    <>
+      <Button
+        variant="default"
+        size="sm"
+        onClick={handlePrepare}
+        disabled={preparing || generating}
+      >
+        {preparing ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {progress || 'Preparing...'}
+          </>
+        ) : (
+          <>
+            <FileText className="mr-2 h-4 w-4" />
+            Generate Submission Report
+          </>
+        )}
+      </Button>
+
+      {reviewData && (
+        <SubmissionReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          data={reviewData}
+          onConfirm={handleConfirmGenerate}
+          generating={generating}
+        />
       )}
-    </Button>
+    </>
   );
 }
