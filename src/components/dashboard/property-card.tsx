@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Building2, AlertTriangle, Clock, DollarSign } from 'lucide-react';
+import { Building2, AlertTriangle, Clock } from 'lucide-react';
 import type { PropertyPortfolioStats } from '@/lib/types';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/status-transitions';
 import type { ViolationStatus } from '@/lib/types';
@@ -53,10 +52,11 @@ export function PropertyCard({ property }: PropertyCardProps) {
                 <span>{property.violation_count} Violations</span>
               </div>
             </div>
-            {(hasOverdue || hasP1) && (
-              <Badge variant="destructive" className="shrink-0 text-[0.65rem] uppercase tracking-wider font-bold rounded-md bg-red-100 text-red-700 hover:bg-red-200 border-0 shadow-none">
-                {hasOverdue ? 'Overdue' : 'P1 Urgent'}
-              </Badge>
+            {property.total_fines > 0 && (
+              <div className="text-right shrink-0">
+                <span className="text-xl font-black tracking-tight text-slate-900">${property.total_fines.toLocaleString()}</span>
+                <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-slate-400 mt-0.5">Total Fines</p>
+              </div>
             )}
           </div>
 
@@ -85,20 +85,18 @@ export function PropertyCard({ property }: PropertyCardProps) {
 
           {/* Footer metrics */}
           <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-auto">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <DollarSign className="h-3.5 w-3.5" />
-              <span>{property.total_fines.toLocaleString()}</span>
-            </div>
+            {hasOverdue ? (
+              <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-md">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>{property.overdue_count} overdue</span>
+              </div>
+            ) : (
+              <div />
+            )}
             {deadlineText && (
               <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                 <Clock className="h-3.5 w-3.5" />
                 <span>Next: {deadlineText}</span>
-              </div>
-            )}
-            {hasOverdue && !deadlineText && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-md">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span>{property.overdue_count} overdue</span>
               </div>
             )}
           </div>
