@@ -115,6 +115,7 @@ export const parseNOI = inngest.createFunction(
         .eq('org_id', orgId)
         .eq('notice_id', noticeId)
         .neq('id', violationId)
+        .eq('parse_status', 'completed')
         .limit(1)
         .maybeSingle();
 
