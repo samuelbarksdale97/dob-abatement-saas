@@ -1,48 +1,72 @@
-# DOB Abatement SaaS — Project Status & Handoff Document
+# DOB Abatement SaaS — Complete Project Documentation
 
-**Last updated:** 2026-03-11
+**Last updated:** 2026-03-24
 **Author:** Samuel Barksdale + Claude Code (Opus 4.6)
 **Repo:** https://github.com/samuelbarksdale97/dob-abatement-saas
+**Production:** https://yoke.nexark.ai (custom domain) / https://dob-abatement-saas.vercel.app
 **Vercel:** Connected to repo (auto-deploys on push to `main`)
 
 ---
 
-## 0. Supporting Documents (in `docs/`)
+## Table of Contents
 
-All reference material is checked into the repo under `docs/`:
-
-| File | What It Is |
-|------|-----------|
-| [technical-specification.md](docs/technical-specification.md) | Full tech spec — functional requirements, data models, acceptance criteria, UI/UX specs, implementation phases, user stories |
-| [meeting-transcript-2026-01-12-kickoff.md](docs/meeting-transcript-2026-01-12-kickoff.md) | Team kickoff meeting (Chris Grant, Nikita Gray, Andy Parker, Sam Barksdale) — full lifecycle walkthrough, business context, 184 open violations |
-| [meeting-transcript-2026-01-15-process-walkthrough.md](docs/meeting-transcript-2026-01-15-process-walkthrough.md) | 1-on-1 with Nikita — detailed process walkthrough, manual submission template, photo requirements, DOB portal demo |
-| [DOB_Abatement_Flowchart.html](docs/DOB_Abatement_Flowchart.html) | Visual flowchart of the full abatement lifecycle (open in browser) |
-| [n8n-parser-workflow.json](docs/n8n-parser-workflow.json) | Original n8n proof-of-concept workflow (pre-SaaS) for PDF parsing and photo matching |
-| [sample-nois/](docs/sample-nois/) | Two real NOI PDFs for testing the parse pipeline |
+1. [What This Is](#1-what-this-is)
+2. [Tech Stack](#2-tech-stack)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Database Schema](#4-database-schema)
+5. [Pages & Routes](#5-pages--routes)
+6. [API Endpoints](#6-api-endpoints)
+7. [Inngest Pipeline](#7-inngest-pipeline)
+8. [Core Libraries](#8-core-libraries)
+9. [Components](#9-components)
+10. [AI Integration](#10-ai-integration)
+11. [Email System](#11-email-system)
+12. [Auth Flow](#12-auth-flow)
+13. [Status State Machine](#13-status-state-machine)
+14. [Deployment & Infrastructure](#14-deployment--infrastructure)
+15. [Test Coverage](#15-test-coverage)
+16. [Known Issues & Limitations](#16-known-issues--limitations)
+17. [Development Workflow](#17-development-workflow)
+18. [Supporting Documents](#18-supporting-documents)
+19. [Credentials & Access](#19-credentials--access)
+20. [Session Changelog](#20-session-changelog)
 
 ---
 
 ## 1. What This Is
 
-A SaaS platform that automates **DC Department of Buildings (DOB) Notice of Infraction (NOI)** processing for property managers. Upload an NOI PDF → AI extracts all violation data, evidence photos, and remediation tasks → dashboard tracks violations through the full abatement lifecycle.
+A SaaS platform that automates **DC Department of Buildings (DOB) Notice of Infraction (NOI)** processing for property managers. Upload an NOI PDF → AI extracts all violation data, evidence photos, and remediation tasks → dashboard tracks violations through the full abatement lifecycle → assign contractors → collect repair photos → generate submission PDFs.
 
-**Target user:** Yoke Management (sam@yokemgmt.com) and similar DC property management companies that receive NOIs and need to track abatement deadlines, assign contractors, and submit evidence of compliance.
+**Brand:** Yoke Management Partners
+**Target user:** Yoke Management Partners (DC property management) and similar companies that receive NOIs and need to track abatement deadlines, assign contractors, and submit evidence of compliance.
+
+**Client accounts:**
+- `cgrant@yokepartners.com` — Owner (Christopher Grant)
+- `ngray@yokepartners.com` — Project Manager (Nikita Gray)
+
+**Test account:**
+- `sam@yokemgmt.com` / `TestPass123!` — Owner (development)
 
 ---
 
 ## 2. Tech Stack
 
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| **Framework** | Next.js 16.1.6 (App Router) | React 19, Turbopack dev server |
-| **Styling** | Tailwind CSS 4 + shadcn/ui | `components.json` configured, 15+ UI components |
-| **Auth** | Supabase Auth (SSR) | Email/password, JWT with custom claims hook |
-| **Database** | Supabase PostgreSQL | RLS-secured, multi-tenant by org_id |
-| **Storage** | Supabase Storage (`noi-pdfs` bucket) | Signed URLs for PDF access |
-| **AI** | Google Gemini 2.5 Flash | Two-pass: structured extraction + page analysis |
-| **Background Jobs** | Inngest | 7-step parse pipeline with retries, deadline cron, notification emails |
-| **PDF Rendering** | react-pdf 10.3 | Client-side rendering of PDF pages as evidence photos |
-| **Deployment** | Vercel | Connected to GitHub, auto-deploy on push |
+| Layer | Technology | Version | Notes |
+|-------|-----------|---------|-------|
+| **Framework** | Next.js | 16.1.6 | App Router, React 19, Turbopack dev server |
+| **Language** | TypeScript | 5 | Strict mode |
+| **Styling** | Tailwind CSS 4 + shadcn/ui | — | 15+ UI components, slate color palette |
+| **Auth** | Supabase Auth (SSR) | — | Email/password, JWT with custom claims hook |
+| **Database** | Supabase PostgreSQL | — | RLS-secured, multi-tenant by org_id |
+| **Storage** | Supabase Storage | — | `noi-pdfs` + `contractor-photos` buckets |
+| **AI** | Google Gemini 2.5 Flash | — | Two-pass: structured extraction + page analysis |
+| **Background Jobs** | Inngest | 3.52.0 | Parse pipeline, deadline cron, email notifications |
+| **PDF Rendering** | react-pdf | 10.3 | Client-side rendering of PDF pages as evidence photos |
+| **PDF Generation** | jsPDF + jspdf-autotable | 4.2.0 | Server-side evidence submission documents |
+| **Email** | Resend | 6.9.2 | Transactional emails from `noreply@nexark.ai` |
+| **Charts** | Recharts | 3.8.0 | Analytics dashboards |
+| **Testing** | Vitest | 4.0.18 | + React Testing Library, 191 tests |
+| **Deployment** | Vercel | — | Auto-deploy on push to `main` |
 
 ---
 
@@ -57,72 +81,71 @@ A SaaS platform that automates **DC Department of Buildings (DOB) Notice of Infr
                      ┌───────▼───────┐
                      │   Inngest     │─────▶ Gemini 2.5 Flash
                      │  (Job Queue)  │       (AI Parse Pipeline)
+                     └───────┬───────┘
+                             │
+                     ┌───────▼───────┐
+                     │   Resend      │
+                     │  (Email)      │
                      └───────────────┘
 ```
 
-### Parse Pipeline (Inngest Function: `parse-noi-pdf`)
+### Data Flow
 
-The core value of the product — 7 deterministic steps:
-
-1. **Init** — Mark violation as `PARSING`
-2. **AI Parse** — Download PDF from Supabase Storage, send to Gemini for structured data extraction (notice ID, respondent, address, fines, violation items with codes/descriptions/deadlines)
-3. **Check Duplicate** — Query for existing violation with same `notice_id` in the org; if found, stores `duplicate_detected: true` and `duplicate_violation_id` in `parse_metadata` JSONB
-4. **Insert Records** — Write parsed violation data and items to Supabase
-5. **Auto-Link Property** — Normalize infraction address (BR-004), match to existing property or create new one, extract and match/create unit, set `property_id` and `unit_id` on violation
-6. **Analyze Pages** — Second Gemini call: identify which PDF pages are evidence photos vs. text, match each to a violation code
-7. **Match Photos** — Link evidence photo pages to their violation items by code, insert into `photos` table
-
-Each step uses `ParseLogger` which flushes progress to `violations.parse_metadata` (JSONB) after each step transition, enabling real-time UI updates via polling.
-
-### Status Workflow
-
-```
-NEW → PARSING → PARSED → ASSIGNED → IN_PROGRESS → AWAITING_PHOTOS
-→ PHOTOS_UPLOADED → READY_FOR_SUBMISSION → SUBMITTED → APPROVED → CLOSED
-                                                     → REJECTED → IN_PROGRESS
-```
-
-Valid transitions are enforced in `src/lib/status-transitions.ts`.
+1. **Upload:** User uploads NOI PDF → stored in Supabase Storage → violation record created in DB
+2. **Parse:** Inngest event triggers 7-step pipeline → Gemini extracts data → records inserted → property auto-linked
+3. **Manage:** Dashboard shows violations with stats → user assigns contractor → magic link generated
+4. **Repair:** Contractor uploads before/after photos via portal → AI verifies photo angles
+5. **Submit:** User generates evidence PDF → marks as submitted → records DOB response
+6. **Monitor:** Daily cron checks deadlines → sends email alerts → creates in-app notifications
 
 ---
 
 ## 4. Database Schema
 
 **Supabase project:** `njewqntaitsdwuzvgftq`
-**Migration file:** `supabase/migrations/001_initial_schema.sql`
+**Migrations:** `supabase/migrations/001_initial_schema.sql` through `013_fix_analytics_ghost_filter.sql`
 
 ### Tables
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `organizations` | Multi-tenant orgs | name, slug, plan, settings |
-| `profiles` | User accounts (extends auth.users) | org_id, full_name, email, role |
-| `properties` | Managed properties | address, city, state |
-| `units` | Individual units within properties | property_id, unit_number, is_vacant, occupant_name, occupant_phone |
-| `violations` | NOI records (core entity) | notice_id, respondent, status, priority, parse_metadata, raw_ai_output |
-| `violation_items` | Individual violation line items | violation_code, fine, violation_description, task_description |
-| `photos` | Evidence photos (from PDF pages) | storage_path, page_number, matched_violation_code, violation_item_id |
-| `work_orders` | Repair assignments | assigned_to, status, due_date |
-| `submissions` | DOB compliance submissions | confirmation_number, response_status |
-| `audit_log` | Auto-logged status changes | old_values, new_values |
-| `notifications` | In-app notifications | title, message, type, priority, read |
-| `contacts` | Universal contacts directory | name, company, category, tags, org_id |
-| `contact_interactions` | Interaction log (auto/manual) | contact_id, type, direction, subject, details |
-| `contact_entity_links` | Many-to-many entity links | contact_id, entity_type, entity_id |
-| `invitations` | Team member invitations | email, role, token, expires_at, accepted_at |
+| `organizations` | Multi-tenant workspaces | `name`, `slug` (unique), `plan`, `settings` (JSONB) |
+| `profiles` | User accounts (extends auth.users) | `org_id`, `full_name`, `email`, `role` (enum) |
+| `properties` | Managed buildings | `org_id`, `address`, `city`, `state`, `zip`, `notes` |
+| `units` | Individual units within properties | `property_id`, `unit_number`, `is_vacant`, `occupant_name`, `occupant_phone` |
+| `violations` | NOI records (core entity) | `notice_id`, `respondent`, `infraction_address`, `date_of_service`, `total_fines`, `status`, `priority`, `abatement_deadline`, `pdf_storage_path`, `parse_status`, `parse_metadata` (JSONB), `raw_ai_output` (JSONB) |
+| `violation_items` | Individual violation line items | `violation_id`, `item_number`, `violation_code`, `priority`, `fine`, `violation_description`, `task_description`, `specific_location`, `floor_number`, `date_of_infraction`, `time_of_infraction` |
+| `photos` | Evidence photos | `violation_id`, `violation_item_id`, `photo_type` (INSPECTOR/BEFORE/AFTER), `storage_path`, `page_number`, `matched_violation_code`, `status`, `mime_type` |
+| `work_orders` | Contractor repair assignments | `violation_id`, `contractor_name`, `contractor_email`, `contractor_phone`, `status`, `due_date` |
+| `contractor_tokens` | Magic link tokens for contractor portal | `work_order_id`, `token`, `expires_at` (30 days), `revoked_at` |
+| `contractors` | Contractor registry (for dropdown/recency) | `name`, `email`, `phone`, `total_assignments`, `last_assigned_at` |
+| `submissions` | DOB compliance submissions | `violation_id`, `submitted_by`, `confirmation_number`, `document_storage_path`, `generated_pdf_path`, `response_status` |
+| `audit_log` | Auto-logged status changes | `table_name`, `record_id`, `action`, `old_values`, `new_values` |
+| `notifications` | In-app alerts | `user_id`, `title`, `message`, `type`, `link`, `read` |
+| `contacts` | CRM contact management | `name`, `email`, `phone`, `category` (6 types), `notes` |
+| `contact_interactions` | Interaction log | `contact_id`, `interaction_type`, `date_time`, `notes` |
+| `team_invitations` | Pending team member signups | `email`, `role`, `token`, `expires_at` (7 days) |
+| `email_connections` | Gmail OAuth state | `connected_email`, `status`, `auto_poll_enabled` |
 
-### Key Database Functions & Triggers
+### Enums
 
-- **`auth_org_id()`** — Reads `org_id` from JWT `app_metadata` for RLS
-- **`auth_role()`** — Reads `role` from JWT `app_metadata` for RLS
-- **`custom_access_token_hook()`** — Injects org_id and role from `profiles` table into every JWT. **Registered as a Supabase Auth Hook** (must be enabled in Supabase Dashboard → Authentication → Hooks → "Customize Access Token")
-- **`sync_profile_to_app_metadata()`** — Trigger on `profiles` table that syncs org_id/role to `auth.users.raw_app_meta_data` (fallback for when JWT hook isn't refreshed yet)
-- **`handle_new_user()`** — Auto-creates profile row on user signup if `org_id` is in user metadata
-- **`log_violation_status_change()`** — Auto-logs to `audit_log` when violation status changes
-- **`get_violation_stats()`** — RPC function for dashboard stats
-- **`get_portfolio_stats()`** — RPC function for per-property violation rollups (Portfolio Home)
-- **`get_property_detail(p_property_id)`** — RPC function for per-unit violation rollups within a property
-- **`get_analytics(p_property_id, p_date_from, p_date_to)`** — RPC function for aggregated analytics (avg resolution, approval rate, fines, status distribution, contractor performance)
+- **`user_role`:** OWNER, PROJECT_MANAGER, CONTRACTOR, ADMIN
+- **`violation_status`:** NEW, PARSING, PARSED, ASSIGNED, IN_PROGRESS, AWAITING_PHOTOS, PHOTOS_UPLOADED, READY_FOR_SUBMISSION, SUBMITTED, APPROVED, REJECTED, ADDITIONAL_INFO_REQUESTED, CLOSED
+- **`work_order_status`:** ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+- **`photo_type`:** BEFORE, AFTER, INSPECTOR, REFERENCE
+- **`photo_status`:** PENDING_REVIEW, APPROVED, REJECTED
+
+### Database Functions (RPC)
+
+| Function | Purpose |
+|----------|---------|
+| `auth_org_id()` | Returns current user's org_id from JWT for RLS |
+| `auth_role()` | Returns current user's role from JWT for RLS |
+| `custom_access_token_hook()` | Injects org_id/role from profiles into every JWT (**must be enabled in Supabase Dashboard → Auth → Hooks**) |
+| `get_violation_stats()` | Dashboard stats — excludes ghost/duplicate violations |
+| `get_portfolio_stats()` | Per-property violation rollups for Portfolio Home |
+| `get_property_detail(p_property_id)` | Per-unit violation rollups within a property |
+| `get_analytics(p_date_from, p_date_to, p_property_id)` | Aggregated analytics — resolution time, approval rate, fines, status distribution, contractor performance |
 
 ### Row Level Security (RLS)
 
@@ -130,400 +153,629 @@ Every table has RLS enabled. All policies use `auth_org_id()` to scope data to t
 
 ### Supabase Realtime
 
-Granted to: `violations`, `violation_items`, `photos`, `work_orders`, `notifications`, `contacts`, `contact_interactions`
+Enabled on: `violations`, `violation_items`, `photos`, `work_orders`, `notifications`, `contacts`, `contact_interactions`
 
 ---
 
-## 5. File Structure & Key Files
+## 5. Pages & Routes
+
+### Public Pages
+
+| Route | File | Purpose |
+|-------|------|---------|
+| `/login` | `src/app/login/page.tsx` | Email/password login with "Forgot password?" link |
+| `/signup` | `src/app/signup/page.tsx` | Team member signup via invitation token (wrapped in Suspense) |
+| `/forgot-password` | `src/app/forgot-password/page.tsx` | Request password reset email |
+| `/reset-password` | `src/app/reset-password/page.tsx` | Set new password from reset link |
+| `/contractor/[token]` | `src/app/contractor/[token]/page.tsx` | Contractor portal — work order details, violation items, photo upload, status updates |
+
+### Authenticated Pages (`src/app/(authenticated)/`)
+
+| Route | File | Purpose |
+|-------|------|---------|
+| `/dashboard` | `dashboard/page.tsx` | **Portfolio Home** — stats panel, property cards grid with violation counts/fines, Upload NOI button |
+| `/dashboard/[id]` | `dashboard/[id]/page.tsx` | **Violation Detail** — overview, key metrics, tabs (Items, Photos, Submissions, Activity), assign contractor, generate PDF, delete |
+| `/violations` | `violations/page.tsx` | **All Infractions** — filterable table with search, status/priority/property filters, sorting, pagination, delete. Excludes ghost violations |
+| `/parse` | `parse/page.tsx` | **Upload NOI** — three-state workflow: upload → processing (with duplicate detection prompt) → results |
+| `/properties/[id]` | `properties/[id]/page.tsx` | **Property Detail** — address, stats, units list, delete |
+| `/properties/[id]/units/[unitId]` | `properties/[id]/units/[unitId]/page.tsx` | **Unit Detail** — occupant info, tabbed violation view (Needs Action, In Progress, Submitted, Resolved), edit details, delete |
+| `/contacts` | `contacts/page.tsx` | **Contacts** — search, category filter, add contact dialog |
+| `/contacts/[id]` | `contacts/[id]/page.tsx` | **Contact Detail** — info, interactions log, add interaction |
+| `/analytics` | `analytics/page.tsx` | **Analytics** — KPI cards, Recharts charts (violations over time, status donut, fines by property, contractor performance) |
+| `/settings` | `settings/page.tsx` | **Settings** — Gmail (Coming Soon), Team (invite/role management with resend), Testing (skip photo verification toggle) |
+
+### Hidden/Removed Pages
+- `/import` — CSV import (hidden from sidebar, kept in codebase)
+- Notification bell — removed from nav bar (feature not fully fleshed out)
+- Notification preferences — removed from settings
+
+---
+
+## 6. API Endpoints
+
+### Parse Pipeline
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/parse` | Upload PDF, create violation record, trigger Inngest parse event |
+| POST | `/api/parse/duplicate` | Resolve duplicate detection — `{ violationId, action: 'overwrite' | 'cancel' }` |
+
+### Violations
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/violations` | List violations with filters (status, priority, search, property_id, unit_id, date range, needs_attention, statuses). Pagination + sorting. Excludes ghosts |
+| PATCH | `/api/violations` | Update violation status and fields |
+| DELETE | `/api/violations/[id]` | Delete violation + cascading data (items, photos, work orders, tokens, audit log) |
+| POST | `/api/violations/[id]/merge` | Merge duplicate violations (items + photos) |
+
+### Stats & Analytics
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/stats` | Dashboard stats via `get_violation_stats()` RPC |
+| GET | `/api/portfolio` | Portfolio home stats via `get_portfolio_stats()` RPC |
+| GET | `/api/analytics` | Analytics data via `get_analytics()` RPC with date range + property filters |
+
+### Properties & Units
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/properties` | List all properties with units |
+| POST | `/api/properties` | Create new property |
+| GET | `/api/properties/[id]` | Property detail with violations and units |
+| DELETE | `/api/properties/[id]` | Delete property + cascade (units, violations) |
+| GET/POST | `/api/properties/[id]/units` | List/create units |
+| PATCH | `/api/properties/[id]/units/[unitId]` | Update unit metadata |
+
+### Contractor Portal (public — no auth required)
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/contractor/[token]` | Validate magic link, return work order + violation + items + photos + PDF URL |
+| PATCH | `/api/contractor/[token]/status` | Update work order status (ASSIGNED → IN_PROGRESS → COMPLETED) |
+| POST | `/api/contractor/[token]/photos` | Upload BEFORE/AFTER photos (JPEG/PNG/HEIC/WebP, max 10MB) |
+| POST | `/api/contractor/[token]/photos/verify` | AI photo angle verification (can be skipped via settings) |
+
+### Work Orders
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/work-orders` | Create work order + magic link token (30-day expiry) + send email notification |
+
+### Team & Auth
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/team` | List team members and pending invitations |
+| POST | `/api/team/invite` | Send invitation email (7-day expiry) |
+| POST | `/api/team/invite/resend` | Resend pending invitation |
+| PATCH | `/api/team/[userId]/role` | Change user role |
+| POST | `/api/signup` | Complete team invitation signup |
+
+### Contacts
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET/POST | `/api/contacts` | List (search/filter) or create contacts |
+| GET/PATCH/DELETE | `/api/contacts/[id]` | Contact CRUD |
+| GET/POST | `/api/contacts/[id]/interactions` | Interaction history |
+| POST | `/api/contacts/[id]/link` | Link contact to entity |
+| GET | `/api/contacts/search` | Typeahead search |
+
+### Submissions
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET/POST | `/api/submissions` | List or create submissions with PDF generation |
+| PATCH | `/api/submissions/[id]` | Update submission status (DOB response) |
+
+### Notifications
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/notifications` | List notifications |
+| GET | `/api/notifications/count` | Unread count |
+| PATCH | `/api/notifications/[id]` | Mark as read |
+| POST | `/api/notifications/mark-all-read` | Mark all as read |
+
+### Settings
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET/PATCH | `/api/settings` | Org settings (skip_photo_verification toggle) |
+
+### Inngest
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST/GET | `/api/inngest` | Inngest function event receiver |
+
+---
+
+## 7. Inngest Pipeline
+
+### `parse-noi` — Main Parse Pipeline
+
+**Trigger:** `noi/parse.requested` event
+**Retries:** 2
+**File:** `src/inngest/functions/parse-noi.ts`
+
+7 deterministic steps with real-time progress logging via `ParseLogger`:
+
+| Step | Name | What It Does |
+|------|------|-------------|
+| 0 | **init** | Mark violation as `PARSING`, set up metadata |
+| 1 | **ai-parse** | Download PDF from Supabase Storage, send to Gemini for structured extraction. Extracts: notice_id, respondent, address, date, fines, violation items (code, description, priority, deadline, fine, location, floor, date/time, task) |
+| 1.5 | **check-duplicate** | Query for existing completed violation with same notice_id. If found → set `parse_status: 'duplicate_pending'`, wait up to 5 min for user decision via `waitForEvent('noi/duplicate.resolved')`. Overwrite = delete old + continue. Cancel/timeout = halt |
+| 2 | **insert-records** | Write violation data + items to DB (idempotent — deletes existing before insert) |
+| 3 | **auto-link-property** | Normalize address (strip abbreviations, unit, city/state/zip), match/create property and unit |
+| 4 | **analyze-pages** | Second Gemini call: identify which pages are evidence photos, match each to violation code |
+| 5 | **match-photos** | Link evidence pages to violation items by code, insert INSPECTOR photo records (idempotent) |
+| 6 | **complete** | Mark `parse_status: 'completed'`, final validation |
+
+Each step updates `violations.parse_metadata` (JSONB) enabling real-time UI polling at 3-second intervals.
+
+### `deadline-check` — Daily Deadline Cron
+
+**Schedule:** Daily at 8:00 AM ET (13:00 UTC)
+**File:** `src/inngest/functions/deadline-check.ts`
+
+Checks for violations with deadlines approaching (within 10 days) or overdue. Creates in-app notifications and sends email alerts to OWNER/PM/ADMIN team members via Resend.
+
+### `send-notification-email` — Transactional Emails
+
+**Trigger:** Event-driven
+**File:** `src/inngest/functions/send-notification-email.ts`
+
+Sends transactional emails (deadline alerts, submission confirmations) via Resend.
+
+### `email-sync` — Gmail Integration
+
+**File:** `src/inngest/functions/email-sync.ts`
+
+Gmail OAuth integration for auto-syncing NOI attachments. Currently marked as "Coming Soon" in the UI.
+
+---
+
+## 8. Core Libraries
+
+### `src/lib/ai/`
+
+| File | Purpose |
+|------|---------|
+| `gemini.ts` | Gemini 2.5 Flash API wrapper — `parseNOIPdf()` for structured extraction, `analyzePdfPages()` for page-level analysis, `verifyPhotoAngle()` for before/after comparison. Includes token usage tracking and cost calculation |
+| `schemas.ts` | Zod schemas for AI responses (`NOIParseResultSchema`, `GeminiPageAnalysisSchema`). TypeScript types: `ParseMetadata`, `ParseStepStatus`, `ParseStepName`, `ParseCosts`, `GeminiUsage` |
+
+### `src/lib/supabase/`
+
+| File | Purpose |
+|------|---------|
+| `client.ts` | Browser-side Supabase client using `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| `server.ts` | `createClient()` — server-side with user session via cookies. `createAdminClient()` — service role key for Inngest/webhooks (bypasses RLS) |
+| `middleware.ts` | Session refresh on every request. Redirects unauthenticated users to `/login` (excludes API routes, `/signup`, `/contractor`) |
+
+### `src/lib/`
+
+| File | Purpose |
+|------|---------|
+| `types.ts` | All TypeScript interfaces: Organization, Profile, Property, Unit, Violation, ViolationItem, Photo, WorkOrder, ContractorToken, Contractor, Submission, Contact, AuditLogEntry. Type aliases for enums |
+| `status-transitions.ts` | Valid state transitions (enforced), status labels/colors, priority colors/labels, urgency calculation (days remaining, color coding). Functions: `canTransition()`, `getNextStatuses()`, `getDaysRemaining()` |
+| `address-normalization.ts` | Normalize NOI addresses: lowercase, expand abbreviations (st→street, nw→northwest), extract unit numbers, strip city/state/zip. Functions: `normalizeAddress()`, `addressesMatch()` |
+| `email.ts` | Resend integration. FROM_EMAIL: `Yoke Management Partners <noreply@nexark.ai>`. Templates: `invitationEmail()`, `deadlineAlertEmail()`, `submissionConfirmationEmail()`. Branded HTML wrapper with Yoke Management styling |
+| `parse-logger.ts` | Structured logging for parse pipeline. Flushes step progress to `violations.parse_metadata` JSONB after each step transition. Tracks timing, errors, validation |
+| `utils.ts` | `cn()` utility for className merging |
+
+### `src/lib/pdf/`
+
+| File | Purpose |
+|------|---------|
+| `generate-submission.ts` | Generate evidence submission PDF via jsPDF. Includes violation details, items table, reference photos, contractor photos. Sender name: Christopher Grant |
+| `render-page-server.ts` | Server-side PDF page rendering using `pdf-to-img` with `getPage()` for direct page access (not used in current pipeline — kept for future use) |
+
+---
+
+## 9. Components
+
+### Layout
+- **`layout/sidebar.tsx`** — Left sidebar with Yoke Management Partners branding (red/black text). Menu: Dashboard, Infractions, Parse, Contacts, Analytics, Settings
+- **`layout/nav.tsx`** — Top navigation bar with page title
+
+### Parser
+- **`parser/upload-zone.tsx`** — Drag-and-drop PDF upload, calls `/api/parse`
+- **`parser/parse-progress.tsx`** — Real-time step timeline with progress bar, elapsed timer, cost cards. Handles `duplicate_pending` state with overwrite/cancel prompt
+- **`parser/parsed-results.tsx`** — Post-parse results with evidence photos
+- **`parser/evidence-photo.tsx`** — PDF page renderer using react-pdf with lightbox zoom
+
+### Dashboard
+- **`dashboard/stats-panel.tsx`** — Violation stats overview cards
+- **`dashboard/property-card.tsx`** — Property summary card with fines, violation counts, overdue indicator
+- **`dashboard/violation-table.tsx`** — Sortable violations table with pagination and delete
+- **`dashboard/filter-sidebar.tsx`** — Advanced filters (search, status, priority, property, date range, needs attention)
+- **`dashboard/submission-tab.tsx`** — Submission history for violation detail
+
+### Contractor
+- **`contractor/photo-upload-slot.tsx`** — Photo upload widget with camera roll access. Labels: "Upload Repair Photo". Supports JPEG/PNG/HEIC/WebP up to 10MB
+- **`contractor/assign-work-order-dialog.tsx`** — Modal to assign contractor. Defaults to "Add New" tab. Search existing contractors dropdown
+
+### Contacts
+- **`contacts/add-contact-dialog.tsx`** — Add/edit contact form with category selector
+- **`contacts/add-interaction-dialog.tsx`** — Log contact interaction
+
+### UI Components (shadcn/ui)
+Button, Input, Label, Card, Badge, Tabs, Dialog, Separator, Dropdown Menu, Select, Textarea, Table, Progress, Switch, Command, Avatar, Checkbox, Sheet, Sonner (toast)
+
+---
+
+## 10. AI Integration
+
+**Model:** Google Gemini 2.5 Flash (`@google/genai` SDK)
+**File:** `src/lib/ai/gemini.ts`
+
+### Functions
+
+| Function | Input | Output | Cost |
+|----------|-------|--------|------|
+| `parseNOIPdf()` | PDF buffer (base64) | Notice-level data + violation items array | ~$0.002-0.004 |
+| `analyzePdfPages()` | PDF buffer (base64) | Per-page: violation_code, description, is_evidence_photo | ~$0.002-0.004 |
+| `verifyPhotoAngle()` | Two base64 images | Match confidence, reasoning, spatial analysis | — |
+
+### Pricing (per million tokens)
+- Input: $0.15
+- Output: $0.60
+- Thoughts: $0.60
+
+### Extraction Schema (Zod)
+
+```typescript
+NOIParseResultSchema = {
+  notice_level_data: { notice_id, respondent, infraction_address, date_of_service, total_fines },
+  work_orders: [{
+    item_number, violation_code, priority, abatement_deadline, fine,
+    violation_description, specific_location, floor_number,
+    date_of_infraction, time_of_infraction, task_description
+  }]
+}
+```
+
+### Known Issue: Fine Parsing
+Gemini occasionally returns fines with comma-as-decimal (e.g., `$2,358,00` instead of `$2,358.00`). The `parseFine` function strips commas, which turns `$2,358,00` into `235800`. This needs a smarter fine parser that detects and handles this pattern.
+
+---
+
+## 11. Email System
+
+**Provider:** Resend
+**Sender:** `Yoke Management Partners <noreply@nexark.ai>`
+**Domain:** `nexark.ai` (DNS verified in Resend)
+**File:** `src/lib/email.ts`
+
+### Templates
+
+| Template | When Sent | Content |
+|----------|-----------|---------|
+| `invitationEmail()` | Team member invited | Signup link with 7-day expiry |
+| `deadlineAlertEmail()` | Daily deadline check | Overdue/approaching deadline with urgency colors |
+| `submissionConfirmationEmail()` | After submission | Confirmation with submission details |
+| Contractor assignment | Work order created | Magic link to contractor portal |
+
+All templates use branded HTML wrapper with "Yoke Management" header and footer.
+
+**Supabase Auth Emails:** Custom SMTP configured via Resend SMTP bridge for password reset, email verification, etc.
+
+---
+
+## 12. Auth Flow
+
+### Login
+1. User enters email/password at `/login`
+2. Supabase Auth validates credentials, returns JWT
+3. JWT contains `org_id` and `role` via `custom_access_token_hook()`
+4. Middleware refreshes session on every request
+
+### Signup (Invitation-Based)
+1. Admin sends invite via Settings → Team → Invite
+2. Email sent with signup link: `https://yoke.nexark.ai/signup?token=xxx`
+3. User creates account, profile auto-created with org_id from invitation
+
+### Password Reset
+1. User clicks "Forgot password?" on login page
+2. Email sent via Supabase Auth (custom SMTP through Resend)
+3. User clicks link → `/reset-password` page → sets new password
+
+### Contractor Portal (No Auth)
+1. Work order created → magic link token generated (30-day expiry)
+2. Contractor clicks link → `/contractor/[token]`
+3. Token validated against `contractor_tokens` table (checks expiry, revocation)
+4. All operations use admin Supabase client scoped to the work order
+
+### Middleware (`src/lib/supabase/middleware.ts`)
+- Refreshes session on every request
+- Redirects unauthenticated users to `/login`
+- Excludes: API routes, `/signup`, `/contractor/*`, `/forgot-password`, `/reset-password`
+
+---
+
+## 13. Status State Machine
+
+### Violation Status Lifecycle
 
 ```
-src/
-├── app/
-│   ├── (authenticated)/          # Auth-protected routes
-│   │   ├── layout.tsx            # Auth check + sidebar layout
-│   │   ├── dashboard/
-│   │   │   ├── page.tsx          # Portfolio Home: stats + property cards
-│   │   │   └── [id]/page.tsx     # Violation detail: Items tab, Photos tab, Activity tab
-│   │   ├── violations/page.tsx   # All Violations: flat table for power users
-│   │   ├── properties/
-│   │   │   └── [id]/
-│   │   │       ├── page.tsx      # Property Detail: stats, unit cards
-│   │   │       └── units/[unitId]/page.tsx  # Unit Detail: info, violations
-│   │   ├── contacts/
-│   │   │   ├── page.tsx          # Contacts list: category tabs, search, add dialog
-│   │   │   └── [id]/page.tsx     # Contact detail: info card, Timeline, Linked Entities
-│   │   ├── analytics/page.tsx    # Analytics: KPI cards + 4 Recharts charts
-│   │   ├── settings/page.tsx     # Settings: Gmail, Team, Notifications tabs
-│   │   ├── parse/page.tsx        # Upload → Progress → Results state machine
-│   │   ├── error.tsx             # Error boundary for authenticated routes
-│   │   └── import/page.tsx       # CSV import page (basic)
-│   ├── api/
-│   │   ├── parse/route.ts        # POST: upload PDF, create violation, send Inngest event
-│   │   ├── violations/route.ts   # GET (list+filter) and PATCH (update status/fields)
-│   │   ├── stats/route.ts        # GET: calls get_violation_stats() RPC
-│   │   ├── portfolio/route.ts    # GET: portfolio stats + property rollups
-│   │   ├── properties/
-│   │   │   ├── route.ts          # GET (list) / POST (create)
-│   │   │   └── [id]/
-│   │   │       ├── route.ts      # GET (detail) / PATCH (update)
-│   │   │       └── units/
-│   │   │           ├── route.ts  # GET (list) / POST (create)
-│   │   │           └── [unitId]/route.ts  # PATCH (update)
-│   │   ├── analytics/route.ts    # GET: calls get_analytics() RPC
-│   │   ├── notifications/
-│   │   │   ├── route.ts          # GET (list) / POST (mark-all-read)
-│   │   │   ├── count/route.ts    # GET: unread count
-│   │   │   └── [id]/route.ts     # PATCH: mark as read
-│   │   ├── submissions/
-│   │   │   ├── route.ts          # GET (list) / POST (create)
-│   │   │   └── [id]/route.ts     # PATCH (update DOB response)
-│   │   ├── contacts/
-│   │   │   ├── route.ts          # GET (list+search) / POST (create)
-│   │   │   ├── search/route.ts   # GET: typeahead search
-│   │   │   └── [id]/
-│   │   │       ├── route.ts      # GET / PATCH / DELETE (soft)
-│   │   │       ├── interactions/route.ts  # GET / POST
-│   │   │       └── link/route.ts # POST / DELETE entity links
-│   │   ├── team/
-│   │   │   ├── route.ts          # GET members
-│   │   │   ├── invite/route.ts   # POST invite
-│   │   │   └── [userId]/role/route.ts  # PATCH role
-│   │   ├── contractor/[token]/photos/
-│   │   │   ├── route.ts          # POST: upload photo
-│   │   │   └── verify/route.ts   # POST: AI angle verification
-│   │   ├── violations/
-│   │   │   ├── route.ts          # GET (list+filter, 6 new params) / PATCH
-│   │   │   └── [id]/merge/route.ts  # POST: merge duplicate violations
-│   │   ├── import/route.ts       # POST: CSV import
-│   │   └── inngest/route.ts      # Inngest webhook handler
-│   ├── contractor/[token]/
-│   │   ├── page.tsx              # Contractor portal (mobile-responsive)
-│   │   └── error.tsx             # Error boundary for contractor portal
-│   ├── error.tsx                 # Global root error boundary
-│   ├── login/page.tsx            # Email/password login form
-│   └── page.tsx                  # Landing/redirect page
-├── components/
-│   ├── auth/
-│   │   └── auth-listener.tsx     # Listens for auth state changes, refreshes router
-│   ├── dashboard/
-│   │   ├── violation-table.tsx   # Sortable table with AI cost column
-│   │   ├── stats-panel.tsx       # Summary cards (total, overdue, fines)
-│   │   ├── filter-sidebar.tsx    # Status/priority/search filters
-│   │   └── alert-banner.tsx      # Urgent deadline alerts
-│   ├── parser/
-│   │   ├── upload-zone.tsx       # Drag-and-drop PDF upload
-│   │   ├── parse-progress.tsx    # Real-time step timeline + progress bar + cost
-│   │   ├── parsed-results.tsx    # Post-parse results with evidence photos
-│   │   └── evidence-photo.tsx    # PDF page renderer with lightbox zoom
-│   ├── contractor/
-│   │   ├── photo-upload-slot.tsx  # Photo upload with AI angle verification
-│   │   └── assign-work-order-dialog.tsx  # Work order assignment dialog
-│   ├── notifications/
-│   │   └── notification-bell.tsx  # Bell icon + dropdown with Realtime subscription
-│   ├── layout/
-│   │   ├── nav.tsx               # Top navigation bar
-│   │   └── sidebar.tsx           # Left sidebar navigation
-│   └── ui/                       # shadcn/ui primitives (15+ components)
-├── inngest/
-│   ├── client.ts                 # Inngest client config
-│   └── functions/
-│       ├── parse-noi.ts          # 7-step parse pipeline (init, ai-parse, check-duplicate, insert, auto-link, analyze-pages, match-photos)
-│       ├── deadline-check.ts     # Daily cron: overdue/3-day/10-day deadline alerts → notifications + email
-│       └── send-notification-email.ts  # Event-driven: sends transactional emails via Resend
-├── lib/
-│   ├── ai/
-│   │   ├── gemini.ts             # Gemini API wrapper (parse + analyze)
-│   │   └── schemas.ts            # Zod schemas, TypeScript types for parse data
-│   ├── supabase/
-│   │   ├── client.ts             # Browser Supabase client
-│   │   ├── server.ts             # Server client + admin client (service_role)
-│   │   └── middleware.ts         # Session refresh middleware
-│   ├── types.ts                  # All TypeScript interfaces
-│   ├── email.ts                  # Resend integration: deadline alerts + submission confirmation templates
-│   ├── status-transitions.ts     # Valid status transitions + display helpers
-│   ├── address-normalization.ts  # Address normalization + matching (BR-004)
-│   ├── parse-logger.ts           # Structured logging for parse pipeline
-│   ├── pdf/prepare-images.ts     # PDF page → data URL renderer for photo verification
-│   └── utils.ts                  # cn() utility
-└── middleware.ts                 # Next.js middleware (Supabase session refresh)
+NEW → PARSING → PARSED → ASSIGNED → IN_PROGRESS → AWAITING_PHOTOS
+→ PHOTOS_UPLOADED → READY_FOR_SUBMISSION → SUBMITTED → APPROVED → CLOSED
+                                                      → REJECTED → IN_PROGRESS
+```
+
+### Valid Transitions (enforced in `src/lib/status-transitions.ts`)
+
+| From | Valid Targets |
+|------|-------------|
+| NEW | PARSING, ASSIGNED, CLOSED |
+| PARSING | PARSED, NEW |
+| PARSED | ASSIGNED, CLOSED |
+| ASSIGNED | IN_PROGRESS, CLOSED |
+| IN_PROGRESS | AWAITING_PHOTOS, CLOSED |
+| AWAITING_PHOTOS | PHOTOS_UPLOADED, IN_PROGRESS |
+| PHOTOS_UPLOADED | READY_FOR_SUBMISSION, AWAITING_PHOTOS |
+| READY_FOR_SUBMISSION | SUBMITTED, AWAITING_PHOTOS |
+| SUBMITTED | APPROVED, REJECTED, CLOSED |
+| APPROVED | CLOSED |
+| REJECTED | IN_PROGRESS |
+| CLOSED | (terminal) |
+
+### Parse Status Values
+- `pending` — uploaded, not yet parsed
+- `processing` — Inngest pipeline running
+- `duplicate_pending` — waiting for user overwrite/cancel decision
+- `completed` — successfully parsed
+- `failed` — parse error
+- `duplicate` — user cancelled duplicate upload
+
+### UI Tab Grouping (Unit Detail Page)
+
+| Tab | Statuses |
+|-----|----------|
+| Needs Action | NEW, PARSING, PARSED |
+| In Progress | ASSIGNED, IN_PROGRESS, AWAITING_PHOTOS, PHOTOS_UPLOADED, READY_FOR_SUBMISSION |
+| Submitted | SUBMITTED |
+| Resolved | APPROVED, REJECTED, CLOSED |
+
+---
+
+## 14. Deployment & Infrastructure
+
+### Vercel
+- **Project:** `dob-abatement-saas`
+- **Production URL:** `https://yoke.nexark.ai` (custom domain via Dynadot CNAME → `cname.vercel-dns.com`)
+- **Fallback URL:** `https://dob-abatement-saas.vercel.app`
+- **Auto-deploy:** On push to `main` branch
+- **Build:** Next.js 16.1.6 with Turbopack
+
+### Environment Variables (Vercel)
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin key (bypasses RLS) |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `RESEND_API_KEY` | Resend email API key |
+| `INNGEST_EVENT_KEY` | Inngest event key (set by Vercel integration) |
+| `INNGEST_SIGNING_KEY` | Inngest signing key (set by Vercel integration) |
+| `NEXT_PUBLIC_APP_URL` | `https://yoke.nexark.ai` |
+
+### Supabase
+- **Project:** `njewqntaitsdwuzvgftq`
+- **URL:** `https://njewqntaitsdwuzvgftq.supabase.co`
+- **Storage buckets:** `noi-pdfs` (PDFs), `contractor-photos` (repair photos)
+- **Auth hook:** `custom_access_token_hook` must be enabled in Dashboard → Auth → Hooks
+
+### Inngest
+- **Connected via:** Vercel Marketplace integration (auto-manages keys)
+- **Dashboard:** [app.inngest.com](https://app.inngest.com)
+- **Functions registered:** parse-noi, deadline-check, send-notification-email, email-sync
+
+### DNS (Dynadot)
+- **Domain:** `nexark.ai`
+- **Record:** CNAME `yoke` → `cname.vercel-dns.com`
+- **Email:** MX/TXT records for Resend verification
+
+---
+
+## 15. Test Coverage
+
+**Framework:** Vitest 4.0.18 + React Testing Library
+**Total:** 191 tests across 18 files — all passing
+
+### Test Files
+
+| File | Tests | What It Covers |
+|------|-------|----------------|
+| `src/lib/__tests__/status-transitions.test.ts` | 55 | State machine transitions, priority/urgency colors, labels, days remaining |
+| `src/lib/__tests__/address-normalization.test.ts` | 14 | Address parsing, abbreviation expansion, unit extraction, matching |
+| `src/lib/__tests__/work-order-transitions.test.ts` | 5 | Work order status workflows |
+| `src/inngest/__tests__/auto-link-property.test.ts` | 10 | Property auto-linking, address matching scenarios |
+| `src/inngest/__tests__/duplicate-detection.test.ts` | 10 | Duplicate detection logic, cascade delete order, state machine, metadata |
+| `src/app/api/parse/duplicate/__tests__/route.test.ts` | 8 | Duplicate resolution API: auth, validation, Inngest events |
+| `src/app/api/analytics/__tests__/route.test.ts` | 5 | Analytics API: auth, RPC params, filters |
+| `src/app/api/violations/__tests__/route.test.ts` | 6 | Violations API: auth, filters, sorting |
+| `src/app/api/violations/[id]/merge/__tests__/route.test.ts` | 3 | Merge API: auth, validation |
+| `src/app/api/work-orders/__tests__/route.test.ts` | 15 | Work order creation, contractor registry, email |
+| `src/app/api/contractor/[token]/photos/__tests__/route.test.ts` | 14 | Photo upload: validation, storage, duplicates |
+| `src/app/api/contractor/[token]/status/__tests__/route.test.ts` | 4 | Status transitions: valid/invalid |
+| `src/components/parser/__tests__/parse-progress-duplicate.test.tsx` | 7 | Duplicate prompt UI: rendering, button actions, error handling |
+| `src/components/contractor/__tests__/photo-upload-slot.test.tsx` | 14 | Photo upload widget: file validation, preview |
+| `src/components/contractor/__tests__/assign-work-order-dialog.test.tsx` | 5 | Work order dialog: form, submission |
+| `src/test/__tests__/mock-data.test.ts` | 16 | Mock data factory validation |
+
+### Running Tests
+
+```bash
+npm test              # Run all tests
+npm run test:ui       # Interactive UI mode
+npm run test:coverage # Generate coverage reports
 ```
 
 ---
 
-## 6. What's Working (Tested & Verified)
+## 16. Known Issues & Limitations
 
-### Core Features (v1)
-- [x] **PDF Upload** — Drag-and-drop on `/parse`, uploads to Supabase Storage `noi-pdfs` bucket
-- [x] **AI Parse Pipeline** — Full 7-step Inngest function extracts notice data, detects duplicates, violation items, evidence photos, and auto-links to properties/units
-- [x] **Real-time Parse Progress** — Step timeline with status indicators, elapsed timer, token/cost tracking. Uses 3-second polling fallback alongside Supabase Realtime
-- [x] **Parsed Results View** — Shows extracted violation data, items list, evidence photos with captions after parse completes
-- [x] **Evidence Photo Viewer** — Renders individual PDF pages as photos using react-pdf. Click to open lightbox with full-size view. Cards sized to photo width
-- [x] **Dashboard** — Violations list with sorting (priority, deadline, fines), status badges, AI cost column
-- [x] **Violation Detail Page** — Tabbed view: Items (with linked evidence photos), Photos (rendered PDF pages grouped by violation item), Activity (audit log)
-- [x] **Auth Flow** — Login with email/password, session persistence via middleware, JWT includes org_id + role
-- [x] **RLS Working** — All data scoped to organization, verified end-to-end
-- [x] **Cost Tracking** — Per-parse token usage and USD cost displayed on progress page and dashboard table
-- [x] **Contractor Portal** — Magic link access, photo upload, work order status updates
-- [x] **Evidence PDF Generation** — Generate compliance submission PDF with before/after photos
-- [x] **Gmail Email Monitoring** — OAuth integration, auto-sync NOI attachments via Inngest cron
+### Active Issues
 
-### v2 Sprint 1: Navigation Hierarchy & Portfolio Home (Completed 2026-03-11)
-- [x] **Units Table** — `006_units_table.sql` migration with RLS, indexes, unique constraints
-- [x] **Portfolio Home** — Stats bar + property cards grid with violation rollups, replaces old flat dashboard
-- [x] **Property Detail Page** — Breadcrumbs, stats bar (violations/fines/unlinked), unit cards grid
-- [x] **Unit Detail Page** — Breadcrumbs, unit info card, violation list placeholder
-- [x] **Property/Unit CRUD APIs** — GET/POST/PATCH for properties and units
-- [x] **Portfolio API** — `get_portfolio_stats()` and `get_property_detail()` RPCs
-- [x] **Address Normalization** — BR-004 compliant: abbreviation expansion, unit extraction, fuzzy matching
-- [x] **Auto-Link Parse Step** — Parse pipeline auto-creates/matches properties and units from NOI addresses
-- [x] **Sidebar Navigation** — Portfolio Home + All Violations (flat table for power users)
-- [x] **Test Suite** — 152 tests across 12 files (status machine, work orders, address normalization, API routes, components, mock data)
+1. **Fine parsing** — Gemini sometimes returns fines with comma-as-decimal (`$2,358,00`). The parser strips all commas, producing `235800` instead of `2358.00`. Needs a smarter parser.
 
-### v2 Sprint 2: Notifications + Submission Loop (Completed 2026-03-11)
-- [x] **Notification System** — NotificationBell component with Realtime subscription, priority colors (urgent/high/normal/low), mark-read/mark-all-read
-- [x] **Deadline Alerts** — Inngest daily cron checks for overdue/3-day/10-day deadlines, creates in-app notifications, sends email via Resend
-- [x] **Email Templates** — `deadlineAlertEmail` and `submissionConfirmationEmail` with HTML templates via Resend
-- [x] **Submission Tracking** — SubmissionTab on violation detail: record submissions with confirmation numbers, record DOB responses (PENDING/APPROVED/REJECTED/ADDITIONAL_INFO_REQUESTED)
-- [x] **Status Auto-Progression** — When all AFTER photos are approved, violation auto-advances to READY_FOR_SUBMISSION
-- [x] **Realtime Subscriptions** — Violation detail page subscribes to violations, photos, and work_orders changes
+2. **PDF re-download** — Parse pipeline downloads the PDF twice (once for structured extraction, once for page analysis). Could cache the buffer.
 
-### v2 Sprint 3: Contacts + Users (Completed 2026-03-11)
-- [x] **Universal Contacts System** — Contacts with 6 categories (CONTRACTOR, GOVERNMENT, TENANT, INTERNAL, VENDOR, OTHER), interactions, entity links
-- [x] **Contacts Pages** — List page with category tabs + search, detail page with Timeline and Linked Entities tabs
-- [x] **Contact Interactions** — 5 types (NOTE, PHONE_CALL, EMAIL, MEETING, SYSTEM_EVENT) with direction tracking and auto-updated last_interaction_at
-- [x] **Team Management** — Invite members via Resend email, role dropdown (OWNER/ADMIN/PROJECT_MANAGER/CONTRACTOR), last-owner protection
-- [x] **Settings Tabs** — Gmail, Team, Notifications tabs with per-user notification preferences
-- [x] **Data Migration** — Existing contractors auto-migrated to contacts system with entity links and interaction backfill
+3. **`canvas` on Vercel** — `@napi-rs/canvas` is included for server-side PDF rendering but the render step was removed from the pipeline. The dependency can be cleaned up.
 
-### v2 Sprint 4: Polish + Hardening (Completed 2026-03-11)
-- [x] **Enhanced Filter Sidebar** — Property dropdown, date range picker, "Needs Attention" quick filter with multi-select statuses
-- [x] **Extended Violations API** — 6 new filter params: property_id, unit_id, date_from, date_to, needs_attention, statuses (comma-separated)
-- [x] **Duplicate NOI Detection** — Parse pipeline detects existing notice_id, UI shows merge/keep-separate options, merge API merges items+photos
-- [x] **Analytics Page** — KPI cards (avg resolution, approval rate, fines, open/closed), 4 Recharts charts (line, donut, 2 bar), property+date filters
-- [x] **Mobile Contractor Portal** — Responsive grid (stacked on mobile), 44px min touch targets, camera capture
-- [x] **React Error Boundaries** — error.tsx at root, authenticated, and contractor portal levels
-- [x] **Test Suite** — Expanded to 166 tests across 15 files
+4. **Package name** — `package.json` says `"name": "app"` — should be `"dob-abatement-saas"`.
+
+### Features Not Yet Fully Implemented
+
+5. **Gmail inbox auto-sync** — OAuth integration exists but UI shows "Coming Soon"
+6. **Notification preferences** — Backend exists but UI tab was removed pending UX design
+7. **Notification bell** — Component exists but removed from nav bar pending UX design
+8. **CSV import** — Basic page exists but hidden from sidebar
+
+### Resolved Issues (for context)
+
+- **DOMMatrix error on Vercel** — Resolved by adding `@napi-rs/canvas` for Linux compatibility, then removing the render step entirely
+- **Duplicate properties** — Addresses with city/state/zip suffix created duplicates. Fixed with improved address normalization stripping
+- **Analytics ghost violations** — Migration 013 added ghost/duplicate filters to `get_analytics()`
+- **Signup build error** — `useSearchParams()` needed Suspense boundary for Next.js prerendering
+- **Failed parses blocking re-uploads** — Duplicate detection now only matches `parse_status='completed'` violations
 
 ---
 
-## 7. Known Issues & Technical Debt
+## 17. Development Workflow
 
-### Must Fix Before Production
+### Branch Strategy
+- **Never commit directly to `main`**
+- Create feature/fix branches: `feat/...`, `fix/...`, `ui/...`, `docs/...`
+- Push to remote, create PR via `gh pr create`
+- Merge after review
 
-1. **Inngest on Vercel** — Inngest requires either:
-   - Install from Vercel Marketplace (recommended): adds `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` automatically
-   - Or self-host and configure manually
-   - **Without Inngest, the parse pipeline won't work in production**
+### Testing Requirements
+- **Every change must be tested before committing**
+- Run `npx tsc --noEmit` for type checking
+- Run `npm test` for test suite (191 tests must pass)
+- For API changes: test with actual requests
+- For UI changes: verify in browser
 
-2. **Supabase Auth Hook** — The `custom_access_token_hook` must be **enabled in the Supabase Dashboard** (Authentication → Hooks → Customize Access Token → select `custom_access_token_hook`). Without it, JWTs won't contain org_id/role and RLS will block everything.
+### Local Development
 
-3. **Credential Rotation** — The Supabase service role key was briefly exposed in a public git commit (now purged from history). **Rotate the service role key** in Supabase Dashboard → Settings → API → regenerate. Update `.env.local` and Vercel env vars after.
+```bash
+# Terminal 1: Next.js dev server
+cd dob-abatement-saas
+PORT=3006 npm run dev    # port 3000 often occupied
 
-4. **Environment Variables on Vercel** — Must be set manually:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `GEMINI_API_KEY`
-   - Inngest keys (if not using Marketplace)
+# Terminal 2: Inngest dev server (must match Next.js port)
+npx inngest-cli@latest dev -u http://localhost:3006/api/inngest
+```
 
-### Nice to Fix
+### Deploy to Production
 
-5. **PDF re-download** — The parse pipeline downloads the PDF twice (once for structured extraction, once for page analysis). Could cache the buffer in step state.
-6. **Violation code matching** — Photo-to-item matching uses exact string comparison after normalization. Could be fuzzy.
-7. ~~**No test suite**~~ — **FIXED in Sprint 1, expanded in Sprint 4**: 166 tests across 15 files covering status transitions, work orders, address normalization, API routes, components, analytics, filters, merge, and mock data.
-8. ~~**No error boundary**~~ — **FIXED in Sprint 4**: error.tsx at root, authenticated, and contractor portal levels with "Try Again" buttons.
-9. **Package name** — `package.json` still says `"name": "app"` — should be `"dob-abatement-saas"`.
+```bash
+# Option A: Push to main (auto-deploys)
+git push origin main
 
----
-
-## 8. v2 Roadmap (4 Sprints)
-
-See `docs/pm_docs/v2-productionization/Technical_Specification.md` for full spec.
-
-### Sprint 1: Navigation Hierarchy & Portfolio Home ✅ COMPLETE
-- [x] Units table migration + RPCs
-- [x] Property/Unit CRUD APIs + Portfolio API
-- [x] Address normalization + auto-linking in parse pipeline
-- [x] Portfolio Home, Property Detail, Unit Detail pages
-- [x] Sidebar navigation restructure
-- [x] 152 regression tests
-
-### Sprint 2: Notifications + Submission Loop ✅ COMPLETE
-- [x] Migration `007_notifications_and_submissions.sql` — `priority` column on notifications, `settings` JSONB on profiles, `generated_pdf_path` on submissions
-- [x] Notification API routes (list, mark-read, mark-all-read, count)
-- [x] NotificationBell component in top nav with Realtime subscription, priority colors, relative timestamps
-- [x] Inngest `deadline-check` cron (daily 8AM ET: 10-day, 3-day, overdue alerts with deduplication)
-- [x] Email notification templates via Resend (`deadlineAlertEmail`, `submissionConfirmationEmail`)
-- [x] Inngest `send-notification-email` event-driven function for submission confirmation emails
-- [x] Submission tracking API routes (GET/POST `/api/submissions`, PATCH `/api/submissions/[id]`)
-- [x] SubmissionTab component on violation detail page (record submission, record DOB response)
-- [x] Status auto-progression: all AFTER photos approved → READY_FOR_SUBMISSION
-- [x] Supabase Realtime subscriptions on violation detail page (violations, photos, work_orders)
-
-### Sprint 3: Contacts + Users ✅ COMPLETE
-- [x] Migration `008_contacts.sql` — contacts, contact_interactions, contact_entity_links tables with RLS, enums, triggers, data migration from contractors
-- [x] Migration `009_invitations.sql` — invitations table with 7-day expiry, RLS for OWNER/ADMIN
-- [x] Contacts CRUD APIs (list with search/category/pagination, detail, create, update, soft delete)
-- [x] Contact interactions API (list, create with auto-update last_interaction_at)
-- [x] Contact entity linking API (link/unlink to properties, violations, work_orders)
-- [x] Contact typeahead search API (min 1 char, limit 10)
-- [x] Contacts list page with category tabs, search, avatar initials, add dialog
-- [x] Contact detail page with info card, Timeline tab, Linked Entities tab, interaction dialog
-- [x] Team API routes (list members + pending invitations, send invite via Resend, change role)
-- [x] Settings page with Tabs: Gmail, Team (invite + role management), Notifications (preference toggles)
-- [x] Sidebar navigation updated with Contacts nav item
-- [x] Contractor → Contact data migration in `008_contacts.sql`
-
-### Sprint 4: Polish + Hardening ✅ COMPLETE
-- [x] Enhanced filter sidebar (property dropdown, date range, "Needs Attention" quick filter, multi-status via `statuses` param)
-- [x] Extended violations API (property_id, unit_id, date_from, date_to, needs_attention, statuses filters)
-- [x] Duplicate NOI detection in parse pipeline + merge API + merge/keep-separate UI on parsed results
-- [x] Analytics page with Recharts (KPIs, line chart, donut chart, bar charts for fines/contractors)
-- [x] Analytics API route + `get_analytics()` RPC migration (`010_analytics.sql`)
-- [x] Mobile-responsive contractor portal (stacked layout on mobile, 44px touch targets, camera capture)
-- [x] React error boundaries (error.tsx at root, authenticated, and contractor levels)
-- [x] Sidebar: Analytics nav item added
-- [x] Test suite expanded to 166 tests across 15 files
-- [ ] Inngest on Vercel Marketplace (requires Vercel dashboard — manual step)
+# Option B: Manual deploy
+npx vercel --prod
+```
 
 ---
 
-## 9. Credentials & Access
+## 18. Supporting Documents
+
+All reference material is in `docs/`:
+
+| File | What It Is |
+|------|-----------|
+| `docs/pm_docs/v2-productionization/Technical_Specification.md` | Full v2 tech spec — requirements, data models, acceptance criteria |
+| `docs/meeting-transcript-2026-01-12-kickoff.md` | Kickoff meeting — Chris Grant, Nikita Gray, Andy Parker, Sam Barksdale |
+| `docs/meeting-transcript-2026-01-15-process-walkthrough.md` | Process walkthrough with Nikita — manual submission template, DOB portal |
+| `docs/DOB_Abatement_Flowchart.html` | Visual flowchart of abatement lifecycle |
+| `docs/pm_docs/QA_Testing_Plan.md` | QA testing plan |
+| `docs/sample-nois/` | Two real NOI PDFs for testing (25NOIE-INS-05478, 25NOIR-INS-07709) |
+
+---
+
+## 19. Credentials & Access
 
 ### Supabase
 - **Project ref:** `njewqntaitsdwuzvgftq`
 - **URL:** `https://njewqntaitsdwuzvgftq.supabase.co`
 - **Dashboard:** https://supabase.com/dashboard/project/njewqntaitsdwuzvgftq
-- **Anon key:** In `.env.local`
-- **Service role key:** In `.env.local` (**ROTATE THIS** — was briefly leaked)
+- **Keys:** In `.env.local`
 
-### Test Account
-- **Email:** sam@yokemgmt.com
-- **Password:** TestPass123!
-- **Org:** Yoke Management (`ecaaac47-5f73-4d13-b00a-6f706ce37bdc`)
-- **Role:** OWNER
-- **User ID:** `cc275015-e03b-4683-a1b7-fb98991a6f2c`
+### Accounts
+
+| Email | Role | Purpose |
+|-------|------|---------|
+| `sam@yokemgmt.com` | OWNER | Development/testing |
+| `cgrant@yokepartners.com` | OWNER | Client (Christopher Grant) |
+| `ngray@yokepartners.com` | PROJECT_MANAGER | Client (Nikita Gray) |
 
 ### External Services
-- **Gemini API key:** In `.env.local`
-- **GitHub repo:** https://github.com/samuelbarksdale97/dob-abatement-saas
-- **Vercel:** Connected to GitHub repo (auto-deploys)
+- **Gemini API:** Key in `.env.local`
+- **Resend:** Key in `.env.local`, domain `nexark.ai`
+- **Inngest:** Connected via Vercel Marketplace integration
+- **GitHub:** https://github.com/samuelbarksdale97/dob-abatement-saas
+- **Vercel:** Auto-deploys from GitHub
+- **Domain:** `nexark.ai` on Dynadot, `yoke` CNAME → Vercel
 
 ---
 
-## 10. How to Run Locally
+## 20. Session Changelog
 
-```bash
-# 1. Clone and install
-git clone https://github.com/samuelbarksdale97/dob-abatement-saas.git
-cd dob-abatement-saas
-npm install
+### PRs #1-6: Core Build & Bug Fixes (2026-02-16 → 2026-03-11)
+- Full Next.js app scaffolding, Supabase schema, Gemini AI integration
+- 7-step Inngest parse pipeline with real-time progress
+- Dashboard, violation detail, contractor portal
+- v2 sprints 1-4: portfolio home, units, notifications, contacts, analytics
+- 166 tests across 15 files
 
-# 2. Environment
-cp .env.local.example .env.local
-# Fill in Supabase and Gemini credentials
+### PRs #7-8: UI Tabbed Views & Cleanup (2026-03-23)
+- Unit violations page: tabbed card grid (Needs Action, In Progress, Submitted, Resolved)
+- Edit unit details, delete properties/units/violations
+- Removed AI cost column from All Infractions, renamed Violations → Infractions
 
-# 3. Run the app
-npm run dev              # Next.js on http://localhost:3000
+### PR #9: Contractor Fixes & Tab Grouping (2026-03-23)
+- Fixed contractor modal: defaults to "Add New", overflow fix, email sender
+- Fixed tab status grouping (intake → Needs Action, photos → In Progress)
 
-# 4. Run Inngest (separate terminal)
-npm run dev:inngest      # Inngest dev server on http://localhost:8288
-```
+### PR #10: Delete from All Infractions (2026-03-23)
+- Trash icon on each row with confirmation modal
 
-**Required for parse to work locally:** Both the Next.js dev server AND Inngest dev server must be running. Inngest dev server polls `http://localhost:3000/api/inngest` for function registrations.
+### PR #11: Contractor Photo Upload Fix (2026-03-23)
+- Removed `capture="environment"` so mobile users can choose camera OR photo library
+- Renamed "After Photo" → "Repair Photo"
 
----
+### PR #12: PDF Wrapping, Time Spacing, Submitted Tab (2026-03-23)
+- Fixed text wrapping in submission PDF
+- Fixed time of infraction overlapping
+- Added "Submitted" as fourth tab category
 
-## 11. Key Design Decisions & Lessons Learned
+### PR #13: Client Onboarding & Cleanup (2026-03-23)
+- Provisioned client accounts (cgrant, ngray)
+- Password reset flow (forgot-password, reset-password pages)
+- Hidden CSV import, Gmail "Coming Soon", removed notifications UI
 
-1. **Gemini 2.5 Flash over GPT-4o** — Chosen for native PDF understanding (no OCR needed), structured JSON output, and significantly lower cost (~$0.003 per parse).
+### PRs #14-15: Logo & Branding (2026-03-23)
+- Replaced logo with styled text: "Yoke" (red) "Management" (black) "Partners" (red)
 
-2. **Two-pass AI extraction** — First pass extracts structured data (notice ID, items, fines). Second pass analyzes pages for evidence photos. Separating these improved reliability vs. a single combined prompt.
+### PRs #16-17: Photo Rendering & Analytics Fix (2026-03-23)
+- Removed render-evidence-images step (was causing serverless timeouts)
+- Contractor portal uses same EvidencePhoto component as main app
+- Fixed duplicate properties via address normalization (strips city/state/zip)
+- Migration 013: fixed analytics ghost/duplicate filter
 
-3. **Polling fallback** — Supabase Realtime requires both table enablement AND working RLS policies. A 3-second polling interval ensures the UI always updates even if Realtime has issues.
+### PR #18: Duplicate Detection Fix (2026-03-24)
+- Duplicate check only matches `parse_status='completed'` (failed parses no longer block re-uploads)
 
-4. **RLS via JWT claims** — `custom_access_token_hook` injects org_id/role into every JWT at token refresh time. This is the most performant approach (no extra DB queries per request) but requires the hook to be enabled in Supabase Dashboard.
-
-5. **ParseLogger with merge-flush** — Each Inngest step runs in a fresh execution context. The logger reads existing `parse_metadata` from DB, merges new steps/logs, and writes back. This ensures no data loss across step boundaries.
-
-6. **react-pdf for evidence photos** — Renders individual PDF pages client-side rather than extracting/converting images. Simpler pipeline, but requires the PDF to be accessible via signed URL.
-
-7. **Status workflow as state machine** — Explicit valid transitions prevent invalid state changes. The UI and API both validate transitions before applying.
-
----
-
-## 12. Session Changelog (2026-02-17 → 2026-03-11)
-
-### Session 1: Core Build
-- Full Next.js app scaffolding with App Router
-- Supabase schema (10 tables, RLS, triggers, functions)
-- Gemini AI integration (two-pass parse pipeline)
-- Inngest background job pipeline (5 steps)
-- Dashboard with stats, filters, sorting
-- Login flow with session persistence
-
-### Session 2: UI Polish & Bug Fixes
-- **Fixed:** Parse progress not updating (root cause: missing app_metadata in JWT → RLS blocking client reads)
-- **Fixed:** Parse results never appearing (same RLS root cause)
-- **Added:** Polling fallback for real-time updates
-- **Added:** AI cost tracking (per-parse on progress page, per-violation on dashboard)
-- **Added:** Evidence photo lightbox with click-to-zoom
-- **Fixed:** "Confirm & Create Violation" error (invalid status transition PARSED→NEW)
-- **Added:** Photos rendered on violation detail page (Items tab shows linked photos, Photos tab renders actual pages)
-- **Fixed:** Photo card sizing (constrained to photo width, caption wraps)
-- **Fixed:** Lightbox horizontal scrolling (measures container width via callback ref)
-- **Fixed:** Photo loading flash (hide PDF during intermediate render states)
-
-### Session 3: GitHub & Deployment
-- Created GitHub repo `samuelbarksdale97/dob-abatement-saas`
-- Pushed full codebase
-- Purged leaked credentials from git history
-- Connected Vercel to GitHub repo
-- Created this handoff document
-
-### Session 4: v2 Product Pipeline & Sprint 1 (2026-03-11)
-- **Ran Autonomous Product Pipeline** (Phases 0-11) — produced comprehensive v2 Technical Specification at `docs/pm_docs/v2-productionization/Technical_Specification.md`
-- **Regression test suite** — 152 tests across 12 files (status machine, work orders, address normalization, API routes, components, mock data) establishing green baseline
-- **Units table migration** (`006_units_table.sql`) — units table with RLS, indexes, `get_portfolio_stats()` and `get_property_detail()` RPCs
-- **Property/Unit CRUD APIs** — 6 new API routes (properties list/create/get/update, units list/create/update) + portfolio stats endpoint
-- **Address normalization** (`address-normalization.ts`) — BR-004 compliant address matching with abbreviation expansion, unit extraction, fuzzy matching
-- **Auto-link parse step** — New step in parse pipeline auto-creates/matches properties and units from NOI infraction addresses
-- **Portfolio Home** — Replaced flat violations dashboard with property cards grid showing per-property violation rollups
-- **Property/Unit Detail pages** — 3-level navigation hierarchy (Portfolio → Property → Unit → Violation)
-- **Sidebar navigation** — Added Portfolio Home + All Violations nav items
-- **Branch:** `feat/v2-productionization`
-
-### Session 5: v2 Sprint 2 + Sprint 3 (2026-03-11)
-- **Sprint 2: Notifications + Submission Loop**
-  - Migration `007_notifications_and_submissions.sql` — priority on notifications, settings JSONB on profiles, generated_pdf_path on submissions
-  - NotificationBell component with Realtime subscription, priority-based colors, relative timestamps, mark-read
-  - Inngest `deadline-check` daily cron (8AM ET) — checks overdue/3-day/10-day deadlines, creates notifications, sends email alerts via Resend
-  - Inngest `send-notification-email` — event-driven submission confirmation emails
-  - Email service (`lib/email.ts`) with Resend integration and HTML templates (deadline alerts, submission confirmations)
-  - Submission tracking APIs (GET/POST/PATCH) with auto-status advancement
-  - SubmissionTab component on violation detail page — record submissions + DOB responses
-  - Auto-progression: all AFTER photos approved → READY_FOR_SUBMISSION
-  - Supabase Realtime subscriptions on violation detail page
-- **Sprint 3: Contacts + Users**
-  - Migration `008_contacts.sql` — contacts, contact_interactions, contact_entity_links tables with RLS, enums, triggers, contractor data migration
-  - Migration `009_invitations.sql` — team invitations with 7-day expiry
-  - 8 new contact API routes (CRUD, interactions, entity links, typeahead search)
-  - 3 new team API routes (list members, invite, change role)
-  - Contacts list page with category tabs, search, avatar initials
-  - Contact detail page with Timeline tab, Linked Entities tab, interaction logging
-  - Settings page restructured with Tabs: Gmail, Team (invite + role management), Notifications (preference toggles)
-  - Sidebar updated with Contacts nav item
-
-### Session 6: v2 Sprint 4 — Polish + Hardening (2026-03-11)
-- **Enhanced Filter Sidebar** — property dropdown (fetches from API), date range pickers, "Needs Attention" quick-filter toggle
-- **Extended Violations API** — 6 new query params: `property_id`, `unit_id`, `date_from`, `date_to`, `needs_attention`, `statuses` (multi-select)
-- **Violations page** updated to wire all enhanced filter props
-- **Duplicate NOI Detection** — new `check-duplicate` step in parse pipeline stores `duplicate_detected`/`duplicate_violation_id` in parse_metadata
-- **Duplicate Merge UI** — ParsedResults shows orange warning banner with "Merge Into Existing" / "Keep Separate" buttons
-- **Merge API** (`POST /api/violations/[id]/merge`) — merges items (deduped by code), moves photos, creates audit log, deletes source
-- **Analytics page** (`/analytics`) with Recharts — 4 KPI cards + 4 charts (violations over time, status donut, fines by property, contractor performance)
-- **Analytics API** (`GET /api/analytics`) + migration `010_analytics.sql` with `get_analytics()` RPC
-- **Sidebar** — added Analytics nav item with BarChart3 icon
-- **Mobile Contractor Portal** — responsive grid (1-col < sm), 44px min touch targets, camera capture already in place
-- **React Error Boundaries** — `error.tsx` at root, `(authenticated)/error.tsx`, and `contractor/[token]/error.tsx` with "Try Again" buttons
-- **Test suite** — expanded to 166 tests across 15 files (added analytics API, violations filters, merge API tests)
+### PR #19: Duplicate Overwrite Prompt + Tests (2026-03-24)
+- Pipeline pauses on duplicate detection, shows UI prompt (Overwrite/Cancel)
+- Uses Inngest `waitForEvent` for clean pause/resume (5-min timeout)
+- 25 new tests for duplicate flow (API, UI, pipeline logic)
+- Fixed pre-existing status-transitions test failures (gray→slate, yellow→amber, green→emerald)
+- Total: 191 tests, 18 files, zero failures
