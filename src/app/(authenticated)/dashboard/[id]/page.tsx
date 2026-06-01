@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Circle,
   Building2,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -423,28 +424,40 @@ export default function ViolationDetailPage() {
                     <p className="text-sm text-slate-600 leading-relaxed italic bg-amber-50/50 border border-amber-100/50 p-4 rounded-xl">"{workOrder.notes}"</p>
                   </div>
                 )}
-                {contractorToken && (
-                  <div className="flex flex-col gap-2 w-full">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contractor Access Portal Link</p>
-                    <div className="flex items-center gap-2 max-w-full">
-                      <code className="flex-1 rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs text-slate-600 break-all truncate">
-                        {typeof window !== 'undefined' ? window.location.origin : ''}/contractor/{contractorToken.slice(0, 8)}...
-                      </code>
-                      <Button
-                        size="sm"
-                        className="rounded-xl shrink-0 h-[38px]"
-                        onClick={() => {
-                          const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://yoke.nexark.ai');
-                          const link = `${base}/contractor/${contractorToken}`;
-                          navigator.clipboard.writeText(link);
-                          toast.success('Link copied to clipboard');
-                        }}
-                      >
-                        Copy
-                      </Button>
+                {contractorToken && (() => {
+                  const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://yoke.nexark.ai');
+                  const link = `${base}/contractor/${contractorToken}`;
+                  return (
+                    <div className="flex flex-col gap-2 w-full">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contractor Access Portal Link</p>
+                      <div className="flex flex-wrap items-center gap-2 max-w-full">
+                        <code className="flex-1 min-w-[8rem] rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs text-slate-600 break-all truncate">
+                          {typeof window !== 'undefined' ? window.location.origin : ''}/contractor/{contractorToken.slice(0, 8)}...
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl shrink-0 h-[38px] gap-1.5"
+                          onClick={() => window.open(link, '_blank', 'noopener,noreferrer')}
+                          title="Open the maintenance page in a new tab to fill it out yourself"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open &amp; fill out
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="rounded-xl shrink-0 h-[38px]"
+                          onClick={() => {
+                            navigator.clipboard.writeText(link);
+                            toast.success('Link copied to clipboard');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
