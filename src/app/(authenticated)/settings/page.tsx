@@ -25,6 +25,7 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react';
+import { Nav } from '@/components/layout/nav';
 
 interface EmailConnection {
   id: string;
@@ -196,50 +197,51 @@ function SettingsContent() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Settings</h1>
+    <>
+      <Nav title="Settings" />
+      <div className="mx-auto max-w-3xl p-6">
+        <Tabs defaultValue="gmail">
+          <TabsList>
+            <TabsTrigger value="gmail">Gmail</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="testing">Testing</TabsTrigger>
+          </TabsList>
 
-      <Tabs defaultValue="gmail">
-        <TabsList>
-          <TabsTrigger value="gmail">Gmail</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="testing">Testing</TabsTrigger>
-        </TabsList>
+          <TabsContent value="gmail" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-blue-600" />
+                  <CardTitle>Email Monitoring</CardTitle>
+                </div>
+                <CardDescription>
+                  Automatically detect incoming NOI emails and import them into the system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="py-10 text-center">
+                  <Mail className="mx-auto mb-3 h-12 w-12 text-slate-200" />
+                  <Badge variant="outline" className="text-sm font-semibold text-slate-500 border-slate-300 px-4 py-1">
+                    Coming Soon
+                  </Badge>
+                  <p className="mt-3 text-sm text-slate-400">
+                    Gmail integration for automatic NOI detection is under development.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="gmail" className="mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-blue-600" />
-                <CardTitle>Email Monitoring</CardTitle>
-              </div>
-              <CardDescription>
-                Automatically detect incoming NOI emails and import them into the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="py-10 text-center">
-                <Mail className="mx-auto mb-3 h-12 w-12 text-slate-200" />
-                <Badge variant="outline" className="text-sm font-semibold text-slate-500 border-slate-300 px-4 py-1">
-                  Coming Soon
-                </Badge>
-                <p className="mt-3 text-sm text-slate-400">
-                  Gmail integration for automatic NOI detection is under development.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="team" className="mt-4">
+            <TeamTab />
+          </TabsContent>
 
-        <TabsContent value="team" className="mt-4">
-          <TeamTab />
-        </TabsContent>
-
-        <TabsContent value="testing" className="mt-4">
-          <TestingTab />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="testing" className="mt-4">
+            <TestingTab />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </>
   );
 }
 

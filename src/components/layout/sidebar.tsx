@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Table,
@@ -12,9 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 
-const navItems = [
+export const navItems = [
   { href: '/dashboard', label: 'Portfolio Home', icon: LayoutDashboard },
   { href: '/violations', label: 'All Infractions', icon: Table },
   { href: '/contacts', label: 'Contacts', icon: Users },
@@ -22,24 +21,35 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export function Sidebar() {
+export function SidebarBrand({ className }: { className?: string }) {
+  return (
+    <span className={cn('text-xl font-black tracking-tight leading-tight', className)}>
+      <span className="text-red-600">Yoke</span>{' '}
+      <span className="text-slate-900">Management</span>{' '}
+      <span className="text-red-600">Partners</span>
+    </span>
+  );
+}
+
+/**
+ * Inner navigation shared by the desktop sidebar and the mobile drawer.
+ * `onNavigate` lets the mobile drawer close itself when a link is tapped.
+ */
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    onNavigate?.();
     router.push('/login');
   };
 
   return (
-    <aside className="flex h-[calc(100vh-1rem)] w-[240px] flex-col bg-transparent pl-2 pb-2">
+    <>
       <div className="flex h-20 items-center justify-start px-5 mb-4 mt-2">
-        <span className="text-xl font-black tracking-tight leading-tight">
-          <span className="text-red-600">Yoke</span>{' '}
-          <span className="text-slate-900">Management</span>{' '}
-          <span className="text-red-600">Partners</span>
-        </span>
+        <SidebarBrand />
       </div>
 
       <nav className="flex-1 space-y-1.5 px-4">
@@ -50,6 +60,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'group flex items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200',
                 isActive
@@ -74,6 +85,18 @@ export function Sidebar() {
           Sign Out
         </button>
       </div>
+    </>
+  );
+}
+
+/**
+ * Desktop sidebar. Hidden below the `md` breakpoint, where MobileNav renders a
+ * hamburger-triggered drawer with the same navigation instead.
+ */
+export function Sidebar() {
+  return (
+    <aside className="hidden md:flex h-[calc(100vh-1rem)] w-[240px] flex-col bg-transparent pl-2 pb-2">
+      <SidebarContent />
     </aside>
   );
 }
