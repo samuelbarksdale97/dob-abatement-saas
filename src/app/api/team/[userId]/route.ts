@@ -75,7 +75,11 @@ export async function DELETE(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Ban the auth user so existing/future sessions can no longer authenticate.
+    // Revoke access: the ban invalidates refresh tokens (no new sessions) and is
+    // enforced immediately on every getUser()/middleware check. Caveat inherent to
+    // stateless JWTs: an already-issued access token stays valid until it expires
+    // (~1h) for any direct PostgREST call that bypasses the app, since RLS reads JWT
+    // claims, not ban state. A hard instant cutoff would require rotating the JWT secret.
     await admin.auth.admin.updateUserById(userId, { ban_duration: DEACTIVATE_BAN });
 
     return NextResponse.json({ success: true, deactivated: userId });

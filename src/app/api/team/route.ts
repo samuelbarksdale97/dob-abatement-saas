@@ -36,6 +36,7 @@ export async function GET() {
 
     return NextResponse.json({
       currentUserId: user.id,
+      currentUserRole: role,
       members: allMembers.filter((m) => m.active !== false),
       deactivated: allMembers.filter((m) => m.active === false),
       invitations: (invitationsRes.data || []).map((inv) => ({

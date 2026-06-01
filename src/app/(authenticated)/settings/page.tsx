@@ -325,6 +325,7 @@ function TeamTab() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [deactivated, setDeactivated] = useState<TeamMember[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; status: string; expires_at: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -343,6 +344,7 @@ function TeamTab() {
         setMembers(data.members || []);
         setDeactivated(data.deactivated || []);
         setCurrentUserId(data.currentUserId || null);
+        setCurrentUserRole(data.currentUserRole || null);
         setInvitations(data.invitations || []);
       } else if (res.status === 403) {
         setError('Only Owners and Admins can manage the team. Ensure the Supabase Auth Hook (custom_access_token_hook) is enabled in Dashboard → Authentication → Hooks.');
@@ -540,27 +542,31 @@ function TeamTab() {
                   <Shield className="mr-1 h-3 w-3" />
                   {member.role.replace('_', ' ')}
                 </Badge>
-                <select
-                  className="rounded border border-gray-200 px-2 py-1 text-xs"
-                  value={member.role}
-                  onChange={(e) => handleRoleChange(member.id, e.target.value)}
-                >
-                  <option value="OWNER">Owner</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="PROJECT_MANAGER">Project Manager</option>
-                  <option value="CONTRACTOR">Contractor</option>
-                </select>
-                {member.id !== currentUserId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => handleDeactivate(member)}
-                    disabled={member.role === 'OWNER' && ownerCount <= 1}
-                    title={member.role === 'OWNER' && ownerCount <= 1 ? 'Cannot remove the last owner' : 'Remove member'}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {currentUserRole === 'OWNER' && (
+                  <>
+                    <select
+                      className="rounded border border-gray-200 px-2 py-1 text-xs"
+                      value={member.role}
+                      onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                    >
+                      <option value="OWNER">Owner</option>
+                      <option value="ADMIN">Admin</option>
+                      <option value="PROJECT_MANAGER">Project Manager</option>
+                      <option value="CONTRACTOR">Contractor</option>
+                    </select>
+                    {member.id !== currentUserId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeactivate(member)}
+                        disabled={member.role === 'OWNER' && ownerCount <= 1}
+                        title={member.role === 'OWNER' && ownerCount <= 1 ? 'Cannot remove the last owner' : 'Remove member'}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -586,15 +592,17 @@ function TeamTab() {
                     <p className="text-xs text-gray-400">{member.email}</p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  onClick={() => handleReactivate(member)}
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Reactivate
-                </Button>
+                {currentUserRole === 'OWNER' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => handleReactivate(member)}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reactivate
+                  </Button>
+                )}
               </div>
             ))}
           </CardContent>

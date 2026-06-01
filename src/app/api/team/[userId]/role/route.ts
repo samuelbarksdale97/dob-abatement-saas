@@ -44,7 +44,8 @@ export async function PATCH(
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('org_id', orgId)
-          .eq('role', 'OWNER');
+          .eq('role', 'OWNER')
+          .eq('active', true);
 
         if ((count ?? 0) <= 1) {
           return NextResponse.json(
