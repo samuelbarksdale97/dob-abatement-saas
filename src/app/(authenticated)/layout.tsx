@@ -1,5 +1,4 @@
 import { Sidebar } from '@/components/layout/sidebar';
-import { MobileNav } from '@/components/layout/mobile-nav';
 import { AuthListener } from '@/components/auth/auth-listener';
 
 export default function AuthenticatedLayout({
@@ -13,7 +12,6 @@ export default function AuthenticatedLayout({
       <Sidebar />
       <main className="flex-1 min-w-0">
         <div className="flex h-full flex-col rounded-[1.25rem] bg-white shadow-sm border border-slate-200/60 overflow-hidden">
-          <MobileNav />
           <div className="flex-1 overflow-auto">
             {children}
           </div>
