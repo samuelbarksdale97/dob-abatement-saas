@@ -21,6 +21,9 @@ import {
   Plus,
   Shield,
   FlaskConical,
+  Trash2,
+  RotateCcw,
+  X,
 } from 'lucide-react';
 
 interface EmailConnection {
@@ -316,8 +319,13 @@ function TestingTab() {
   );
 }
 
+type TeamMember = { id: string; full_name: string; email: string; role: string; active?: boolean; created_at: string };
+
 function TeamTab() {
-  const [members, setMembers] = useState<Array<{ id: string; full_name: string; email: string; role: string; created_at: string }>>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [deactivated, setDeactivated] = useState<TeamMember[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; status: string; expires_at: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -334,6 +342,9 @@ function TeamTab() {
       if (res.ok) {
         const data = await res.json();
         setMembers(data.members || []);
+        setDeactivated(data.deactivated || []);
+        setCurrentUserId(data.currentUserId || null);
+        setCurrentUserRole(data.currentUserRole || null);
         setInvitations(data.invitations || []);
       } else if (res.status === 403) {
         setError('Only Owners and Admins can manage the team. Ensure the Supabase Auth Hook (custom_access_token_hook) is enabled in Dashboard → Authentication → Hooks.');
@@ -392,6 +403,60 @@ function TeamTab() {
       toast.error(err instanceof Error ? err.message : 'Failed to change role');
     }
   };
+
+  const handleDeactivate = async (member: TeamMember) => {
+    if (!window.confirm(`Remove ${member.full_name}? They will lose access immediately. You can reactivate them later.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/team/${member.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to remove member');
+      }
+      toast.success(`${member.full_name} removed`);
+      fetchTeam();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove member');
+    }
+  };
+
+  const handleReactivate = async (member: TeamMember) => {
+    try {
+      const res = await fetch(`/api/team/${member.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to reactivate member');
+      }
+      toast.success(`${member.full_name} reactivated`);
+      fetchTeam();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reactivate member');
+    }
+  };
+
+  const handleRevoke = async (inv: { id: string; email: string }) => {
+    if (!window.confirm(`Revoke the pending invitation for ${inv.email}? Their signup link will stop working.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/team/invite/${inv.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to revoke invitation');
+      }
+      toast.success(`Invitation to ${inv.email} revoked`);
+      fetchTeam();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to revoke invitation');
+    }
+  };
+
+  const ownerCount = members.filter((m) => m.role === 'OWNER').length;
 
   const roleColors: Record<string, string> = {
     OWNER: 'bg-purple-100 text-purple-800',
@@ -477,21 +542,72 @@ function TeamTab() {
                   <Shield className="mr-1 h-3 w-3" />
                   {member.role.replace('_', ' ')}
                 </Badge>
-                <select
-                  className="rounded border border-gray-200 px-2 py-1 text-xs"
-                  value={member.role}
-                  onChange={(e) => handleRoleChange(member.id, e.target.value)}
-                >
-                  <option value="OWNER">Owner</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="PROJECT_MANAGER">Project Manager</option>
-                  <option value="CONTRACTOR">Contractor</option>
-                </select>
+                {currentUserRole === 'OWNER' && (
+                  <>
+                    <select
+                      className="rounded border border-gray-200 px-2 py-1 text-xs"
+                      value={member.role}
+                      onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                    >
+                      <option value="OWNER">Owner</option>
+                      <option value="ADMIN">Admin</option>
+                      <option value="PROJECT_MANAGER">Project Manager</option>
+                      <option value="CONTRACTOR">Contractor</option>
+                    </select>
+                    {member.id !== currentUserId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeactivate(member)}
+                        disabled={member.role === 'OWNER' && ownerCount <= 1}
+                        title={member.role === 'OWNER' && ownerCount <= 1 ? 'Cannot remove the last owner' : 'Remove member'}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}
         </CardContent>
       </Card>
+
+      {/* Deactivated members */}
+      {deactivated.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Deactivated ({deactivated.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {deactivated.map((member) => (
+              <div key={member.id} className="flex items-center justify-between rounded-lg border border-dashed p-3 opacity-75">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-400">
+                    {member.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 line-through">{member.full_name}</p>
+                    <p className="text-xs text-gray-400">{member.email}</p>
+                  </div>
+                </div>
+                {currentUserRole === 'OWNER' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => handleReactivate(member)}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reactivate
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pending invitations */}
       {invitations.length > 0 && (
@@ -530,6 +646,15 @@ function TeamTab() {
                   >
                     <Mail className="h-3 w-3" />
                     Resend
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => handleRevoke(inv)}
+                  >
+                    <X className="h-3 w-3" />
+                    Revoke
                   </Button>
                   <Badge variant="outline" className="text-xs">
                     {inv.role.replace('_', ' ')}
