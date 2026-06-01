@@ -20,7 +20,7 @@ export async function GET() {
     const [membersRes, invitationsRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, full_name, email, role, created_at')
+        .select('id, full_name, email, role, active, created_at')
         .eq('org_id', orgId)
         .order('created_at'),
       supabase
@@ -32,8 +32,12 @@ export async function GET() {
         .order('created_at', { ascending: false }),
     ]);
 
+    const allMembers = membersRes.data || [];
+
     return NextResponse.json({
-      members: membersRes.data || [],
+      currentUserId: user.id,
+      members: allMembers.filter((m) => m.active !== false),
+      deactivated: allMembers.filter((m) => m.active === false),
       invitations: (invitationsRes.data || []).map((inv) => ({
         ...inv,
         status: 'pending',
